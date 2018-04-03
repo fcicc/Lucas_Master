@@ -7,41 +7,54 @@ import logging
 import multiprocessing
 import os
 import random
-import sys
-import time
 import re
 import shutil
-
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-import seaborn as sns
-import rpy2.robjects.numpy2ri
-rpy2.robjects.numpy2ri.activate()
-
+import sys
+import time
 from functools import partial
 from multiprocessing.pool import Pool
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 from deap import algorithms, base, creator, tools
+from scipy.spatial import distance
 from sklearn import cluster
 from sklearn.metrics import (accuracy_score, adjusted_rand_score,
                              calinski_harabaz_score, confusion_matrix,
                              f1_score, silhouette_score)
 from sklearn.metrics.cluster import class_cluster_match
+from sklearn.mixture import GaussianMixture
 from sklearn.model_selection import ParameterGrid
 from sklearn.utils.multiclass import unique_labels
-from sklearn.mixture import GaussianMixture
-from scipy.spatial import distance
 from tqdm import tqdm
+
+import rpy2.robjects.numpy2ri
 from rpy2.robjects import r
+
+rpy2.robjects.numpy2ri.activate()
+
 
 logging.getLogger().setLevel(logging.INFO)
 
 
+r('''
+    library('clusterCrit')
+    unique_criteria <- function(X, labels, criteria) {
+        intIdx <- intCriteria(X, as.integer(labels), criteria)
+        intIdx
+    }
+    ''')
 def eval_features(X, ac, individual):
     """Evaluate individual according to silhouette score."""
     pred = ac.fit(X*individual).labels_
+    index1 = r['unique_criteria'](X, pred, 'Dunn')
+    index1 = np.asarray(index1)[0][0]
+    index2 = r['unique_criteria'](X, pred, 'Banfeld_Raftery')
+    index2 = np.asarray(index2)[0][0]
 
-    return silhouette_score(X, pred),
+    return (index1,index2)
 
 
 def perfect_eval_features(X, y, ac, individual):
@@ -68,10 +81,10 @@ def evall_all_metrics(X, y, ac, samples_dist_matrix, individual):
 
     y_pred = class_cluster_match(y, pred)
 
-    adj_rand = adjusted_rand_score(y, pred)
     int_idx = r['all_intern_metrics'](X, pred)
     int_idx = [val[0] for val in list(int_idx)]
 
+    adj_rand = adjusted_rand_score(y, pred)
     f1 = f1_score(y, y_pred, average='weighted')
     acc = accuracy_score(y, y_pred)
 
@@ -122,6 +135,8 @@ def argument_parser():
                         help='wether to use features attributes as categorical individual data')
     parser.add_argument('-p', '--perfect', action='store_true',
                         help='wether to use the perfect evaluation function')
+    parser.add_argument('-e', '--evall-all', action='store_true',
+                        help='wether to use all evaluation metrics available')
 
     args = parser.parse_args()
 
@@ -226,7 +241,7 @@ def main():
                                          affinity='manhattan',
                                          linkage='complete')
 
-    creator.create("FitnessMax", base.Fitness, weights=(1, 1))
+    creator.create("FitnessMax", base.Fitness, weights=(1, -1))
     creator.create("Individual", list, fitness=creator.FitnessMax)
 
     toolbox = base.Toolbox()
@@ -257,12 +272,12 @@ def main():
     for fit, ind in zip(fits, population):
         ind.fitness.values = fit
 
-    correlation = list(pool.map(partial(evall_all_metrics, X_matrix, y, ac, samples_dist_matrix),
+    if args.evall_all:
+        correlation = list(pool.map(partial(evall_all_metrics, X_matrix, y, ac, samples_dist_matrix),
                        toolbox.select(population, k=10)))
     
     NGEN = args.num_gen
     top = []
-    objective_space = []
     for gen in tqdm(range(NGEN)):
         offspring = algorithms.varAnd(
             population, toolbox, cxpb=0.5, mutpb=0.5)
@@ -270,12 +285,11 @@ def main():
         for fit, ind in zip(fits, offspring):
             ind.fitness.values = fit
 
-        best_offspring = list(tools.selBest(offspring, k=10))
-        best_fits = pool.map(partial(evall_all_metrics, X_matrix, y, ac, samples_dist_matrix),
-                             best_offspring)
-        correlation += best_fits
-        objective_space += [(fit[0], fit[4], fit[1], gen+1) for fit in
-                            best_fits]
+        if args.evall_all:
+            best_offspring = list(tools.selBest(offspring, k=10))
+            best_fits = pool.map(partial(evall_all_metrics, X_matrix, y, ac, samples_dist_matrix),
+                                best_offspring)
+            correlation += best_fits
 
         old_top = top
         if top == []:
@@ -334,65 +348,64 @@ def main():
             start_time +
             '_confusion_matrix.csv'))
 
-    correlation=pd.DataFrame.from_dict(correlation)
-    correlation = correlation.drop_duplicates()
-    criteria_names = list(map(lambda x: str(x).lower(), r('getCriteriaNames(TRUE)')))
-    correlation.columns= criteria_names + [
-        'accuracy', 'f1_score', 'adjusted_rand_score']
-    correlation = correlation.sort_values(by='accuracy', axis='rows')
-    correlation = correlation.reset_index(drop=True)
+    if args.evall_all:
+        correlation=pd.DataFrame.from_dict(correlation)
+        correlation = correlation.drop_duplicates()
+        criteria_names = list(map(lambda x: str(x).lower(), r('getCriteriaNames(TRUE)')))
+        correlation.columns= criteria_names + [
+            'accuracy', 'f1_score', 'adjusted_rand_score']
+        correlation = correlation.sort_values(by='calinski_harabasz', axis='rows')
+        correlation = correlation.reset_index(drop=True)
 
-    output_summary.write('Metric correlations:')
-    correlation.corr().to_csv(
-        os.path.join(args.input_dir,
-                     'dataset_analysis' +
-                     start_time +
-                     '_metrics_correlation.csv'),
-        float_format='%.10f',
-        index=True)
+        output_summary.write('Metric correlations:')
+        correlation.to_csv(
+            os.path.join(args.input_dir,
+                        'dataset_analysis' +
+                        start_time +
+                        '_metrics.csv'),
+            float_format='%.10f',
+            index=True)
+        correlation.corr().to_csv(
+            os.path.join(args.input_dir,
+                        'dataset_analysis' +
+                        start_time +
+                        '_metrics_correlation.csv'),
+            float_format='%.10f',
+            index=True)
 
-    plt.figure()
-    ax=correlation[['adjusted_rand_score']].plot(lw=1)
-    correlation[['silhouette']].plot(lw=1, ax=ax, linestyle='--')
-    correlation[['accuracy']].plot(lw=1, ax=ax, linestyle='-.')
-    correlation[['f1_score']].plot(lw=1, ax=ax, linestyle=(0, (5, 10)))
-    correlation[['calinski_harabasz']].plot(
-        secondary_y=True, ax=ax, lw=.5)
-    plt.savefig(
-        os.path.join(
-            args.input_dir,
-            'dataset_analysis' +
-            start_time +
-            '_plot.png'),
-        format='png', dpi=900)
+        plt.figure()
+        ax=correlation[['adjusted_rand_score']].plot(lw=1)
+        correlation[['silhouette']].plot(lw=1, ax=ax, linestyle='--')
+        correlation[['accuracy']].plot(lw=1, ax=ax, linestyle='-.')
+        correlation[['f1_score']].plot(lw=1, ax=ax, linestyle=(0, (5, 10)))
+        correlation[['calinski_harabasz']].plot(
+            secondary_y=True, ax=ax, lw=.5)
+        plt.savefig(
+            os.path.join(
+                args.input_dir,
+                'dataset_analysis' +
+                start_time +
+                '_plot.png'),
+            format='png', dpi=900)
 
-    top_objectives = [(fit[0], fit[4], fit[1], gen+1) for fit in
-                      pool.map(
-                      partial(evall_all_metrics, X_matrix, y, ac, samples_dist_matrix), [top])]
-    objective_space += top_objectives
-    objective_space = pd.DataFrame(objective_space,
-                                   columns=['accuracy', 'f_measure',
-                                            'silhouette', 'generation'])
-    objective_space.drop_duplicates()
-    objective_space = objective_space.apply(
-                      lambda x: x.map(lambda y: y+random.random()/500))
-    plt.figure()
-    points = plt.scatter(objective_space['accuracy'],
-                         objective_space['f_measure'],
-                         c=objective_space['silhouette'],
-                         s=3, cmap='viridis', alpha=0.7)
-    plt.colorbar(points, label='silhouette')
-    top_df = pd.DataFrame(top_objectives, columns=objective_space.columns)
-    sns.regplot("accuracy", "f_measure", data=objective_space, scatter=False)
-    sns.regplot(x=top_df['accuracy'], y=top_df['f_measure'], color='r',
-                fit_reg=False, scatter_kws={"s": 5})
-    plt.savefig(
-        os.path.join(
-            args.input_dir,
-            'dataset_analysis' +
-            start_time +
-            'objective_space.png'),
-        format='png', dpi=900)
+        objective_space = correlation[['accuracy', 'f1_score', 'ratkowsky_lance']]
+        objective_space.drop_duplicates()
+        objective_space = objective_space.apply(
+                        lambda x: x.map(lambda y: y+random.random()/500))
+        plt.figure()
+        points = plt.scatter(objective_space['accuracy'],
+                            objective_space['f1_score'],
+                            c=objective_space['ratkowsky_lance'],
+                            s=3, cmap='viridis', alpha=0.7)
+        plt.colorbar(points, label='ratkowsky_lance')
+        sns.regplot("accuracy", "f1_score", data=objective_space, scatter=False)
+        plt.savefig(
+            os.path.join(
+                args.input_dir,
+                'dataset_analysis' +
+                start_time +
+                '_objective_space.png'),
+            format='png', dpi=900)
 
     output_summary.write(own_script_text)
 
