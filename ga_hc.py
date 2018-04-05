@@ -17,14 +17,14 @@ from functools import partial
 # import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
+# import seaborn as sns
 from deap import algorithms, base, creator, tools
 from scipy.spatial import distance
 from sklearn import cluster
 from sklearn.metrics import (accuracy_score, adjusted_rand_score,
                              calinski_harabaz_score, confusion_matrix,
                              f1_score, silhouette_score)
-from sklearn.metrics.cluster import class_cluster_match
+# from sklearn.metrics.cluster import class_cluster_match
 from sklearn.mixture import GaussianMixture
 from sklearn.model_selection import ParameterGrid
 from sklearn.utils.multiclass import unique_labels
@@ -39,6 +39,71 @@ rpy2.robjects.numpy2ri.activate()
 
 logging.getLogger().setLevel(logging.INFO)
 
+
+
+def class_cluster_match(y_true, y_pred):
+    """Translate prediction labels to maximize the accuracy.
+
+    Translate the prediction labels of a clustering output to enable calc
+    of external metrics (eg. accuracy, f1_score, ...). Translation is done by
+    maximization of the confusion matrix :math:`C` main diagonal sum
+    :math:`\sum{i=0}^{K}C_{i, i}`. Notice the number of cluster has to be equal
+     or smaller than the number of true classes.
+
+    Parameters
+    ----------
+    y_true : array, shape = [n_samples]
+        Ground truth (correct) target values.
+    y_pred : array, shape = [n_samples]
+        Estimated targets as returned by a clustering algorithm.
+
+    Returns
+    -------
+    trans : array, shape = [n_classes, n_classes]
+        Mapping of y_pred clusters, such that :math:`trans\subseteq y_true`
+
+    References
+    ----------
+
+    Examples
+    --------
+    >>> from sklearn.metrics import confusion_matrix
+    >>> from sklearn.metrics.cluster import class_cluster_match
+    >>> y_true = ["class1", "class2", "class3", "class1", "class1", "class3"]
+    >>> y_pred = [0, 0, 2, 2, 0, 2]
+    >>> y_pred_translated = class_cluster_match(y_true, y_pred)
+    >>> y_pred_translated
+    ['class1', 'class1', 'class3', 'class3', 'class1', 'class3']
+    >>> confusion_matrix(y_true, y_pred_translated)
+    array([[2, 0, 1],
+           [1, 0, 0],
+           [0, 0, 2]])
+    """
+
+    classes = unique_labels(y_true).tolist()
+    n_classes = len(classes)
+    clusters = unique_labels(y_pred).tolist()
+    n_clusters = len(clusters)
+
+    if n_clusters > n_classes:
+        classes += ['DEF_CLASS'+str(i) for i in range(n_clusters-n_classes)]
+    elif n_classes > n_clusters:
+        clusters += ['DEF_CLUSTER'+str(i) for i in range(n_classes-n_clusters)]
+
+    C = contingency_matrix(y_true, y_pred)
+    true_idx, pred_idx = linear_assignment(-C).T
+
+    true_idx = true_idx.tolist()
+    pred_idx = pred_idx.tolist()
+
+    true_idx = [classes[idx] for idx in true_idx]
+    true_idx = true_idx + sorted(set(classes) - set(true_idx))
+    pred_idx = [clusters[idx] for idx in pred_idx]
+    pred_idx = pred_idx + sorted(set(clusters) - set(pred_idx))
+
+    return_list = [true_idx[pred_idx.index(y)] for y in y_pred]
+
+    return return_list
 
 r('''
     library('clusterCrit')
