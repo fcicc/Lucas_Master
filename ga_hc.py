@@ -14,7 +14,7 @@ import time
 from functools import partial
 # from multiprocessing.pool import Pool
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -375,39 +375,39 @@ def main():
             float_format='%.10f',
             index=True)
 
-        plt.figure()
-        ax=correlation[['adjusted_rand_score']].plot(lw=1)
-        correlation[['silhouette']].plot(lw=1, ax=ax, linestyle='--')
-        correlation[['accuracy']].plot(lw=1, ax=ax, linestyle='-.')
-        correlation[['f1_score']].plot(lw=1, ax=ax, linestyle=(0, (5, 10)))
-        correlation[['calinski_harabasz']].plot(
-            secondary_y=True, ax=ax, lw=.5)
-        plt.savefig(
-            os.path.join(
-                args.input_dir,
-                'dataset_analysis' +
-                start_time +
-                '_plot.png'),
-            format='png', dpi=900)
+        # plt.figure()
+        # ax=correlation[['adjusted_rand_score']].plot(lw=1)
+        # correlation[['silhouette']].plot(lw=1, ax=ax, linestyle='--')
+        # correlation[['accuracy']].plot(lw=1, ax=ax, linestyle='-.')
+        # correlation[['f1_score']].plot(lw=1, ax=ax, linestyle=(0, (5, 10)))
+        # correlation[['calinski_harabasz']].plot(
+        #     secondary_y=True, ax=ax, lw=.5)
+        # plt.savefig(
+        #     os.path.join(
+        #         args.input_dir,
+        #         'dataset_analysis' +
+        #         start_time +
+        #         '_plot.png'),
+        #     format='png', dpi=900)
 
         objective_space = correlation[['accuracy', 'f1_score', 'ratkowsky_lance']]
         objective_space.drop_duplicates()
         objective_space = objective_space.apply(
                         lambda x: x.map(lambda y: y+random.random()/500))
-        plt.figure()
-        points = plt.scatter(objective_space['accuracy'],
-                            objective_space['f1_score'],
-                            c=objective_space['ratkowsky_lance'],
-                            s=3, cmap='viridis', alpha=0.7)
-        plt.colorbar(points, label='ratkowsky_lance')
-        sns.regplot("accuracy", "f1_score", data=objective_space, scatter=False)
-        plt.savefig(
-            os.path.join(
-                args.input_dir,
-                'dataset_analysis' +
-                start_time +
-                '_objective_space.png'),
-            format='png', dpi=900)
+        # plt.figure()
+        # points = plt.scatter(objective_space['accuracy'],
+        #                     objective_space['f1_score'],
+        #                     c=objective_space['ratkowsky_lance'],
+        #                     s=3, cmap='viridis', alpha=0.7)
+        # plt.colorbar(points, label='ratkowsky_lance')
+        # sns.regplot("accuracy", "f1_score", data=objective_space, scatter=False)
+        # plt.savefig(
+        #     os.path.join(
+        #         args.input_dir,
+        #         'dataset_analysis' +
+        #         start_time +
+        #         '_objective_space.png'),
+        #     format='png', dpi=900)
 
     output_summary.write(own_script_text)
 
