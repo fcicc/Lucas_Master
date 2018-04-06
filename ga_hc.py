@@ -12,7 +12,7 @@ import shutil
 import sys
 import time
 from functools import partial
-# from multiprocessing.pool import Pool
+from multiprocessing.pool import Pool
 
 # import matplotlib.pyplot as plt
 import numpy as np
@@ -29,7 +29,7 @@ from sklearn.mixture import GaussianMixture
 from sklearn.model_selection import ParameterGrid
 from sklearn.utils.multiclass import unique_labels
 from tqdm import tqdm
-from concurrent.futures import ThreadPoolExecutor
+# from concurrent.futures import ThreadPoolExecutor
 
 import rpy2.robjects.numpy2ri
 from rpy2.robjects import r
@@ -312,8 +312,8 @@ def main():
 
     toolbox = base.Toolbox()
 
-    # pool = Pool(multiprocessing.cpu_count())
-    pool = ThreadPoolExecutor(max_workers=multiprocessing.cpu_count())
+    pool = Pool(multiprocessing.cpu_count())
+    # pool = ThreadPoolExecutor(max_workers=multiprocessing.cpu_count())
     # toolbox.register("map_async", pool.map_async)
     toolbox.register("map", pool.map)
 
