@@ -14,10 +14,8 @@ import time
 from functools import partial
 from multiprocessing.pool import Pool
 
-# import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-# import seaborn as sns
 from deap import algorithms, base, creator, tools
 from scipy.spatial import distance
 from sklearn import cluster
@@ -29,7 +27,6 @@ from sklearn.mixture import GaussianMixture
 from sklearn.model_selection import ParameterGrid
 from sklearn.utils.multiclass import unique_labels
 from tqdm import tqdm
-# from concurrent.futures import ThreadPoolExecutor
 
 import rpy2.robjects.numpy2ri
 from rpy2.robjects import r
@@ -51,12 +48,9 @@ r('''
 def eval_features(X, ac, individual):
     """Evaluate individual according to silhouette score."""
     pred = ac.fit(X*individual).labels_
-    index1 = r['unique_criteria'](X, pred, 'Dunn')
-    index1 = np.asarray(index1)[0][0]
-    index2 = r['unique_criteria'](X, pred, 'Banfeld_Raftery')
-    index2 = np.asarray(index2)[0][0]
+    index1 = r['unique_criteria'](X, pred, 'Wemmert_Gancarski')
 
-    return (index1,index2)
+    return (index1,)
 
 
 def perfect_eval_features(X, y, ac, individual):
@@ -248,14 +242,12 @@ def main():
                                          affinity='manhattan',
                                          linkage='complete')
 
-    creator.create("FitnessMax", base.Fitness, weights=(1, -1))
+    creator.create("FitnessMax", base.Fitness, weights=(1, ))
     creator.create("Individual", list, fitness=creator.FitnessMax)
 
     toolbox = base.Toolbox()
 
     pool = Pool(multiprocessing.cpu_count())
-    # pool = ThreadPoolExecutor(max_workers=multiprocessing.cpu_count())
-    # toolbox.register("map_async", pool.map_async)
     toolbox.register("map", pool.map)
 
     toolbox.register("attr_bool", random.choice, [1, 0])
@@ -362,10 +354,8 @@ def main():
         criteria_names = list(map(lambda x: str(x).lower(), r('getCriteriaNames(TRUE)')))
         correlation.columns= criteria_names + [
             'accuracy', 'f1_score', 'adjusted_rand_score']
-        correlation = correlation.sort_values(by='calinski_harabasz', axis='rows')
         correlation = correlation.reset_index(drop=True)
 
-        output_summary.write('Metric correlations:')
         correlation.to_csv(
             os.path.join(input_dir,
                         'dataset_analysis' +
@@ -380,40 +370,6 @@ def main():
                         '_metrics_correlation.csv'),
             float_format='%.10f',
             index=True)
-
-        # plt.figure()
-        # ax=correlation[['adjusted_rand_score']].plot(lw=1)
-        # correlation[['silhouette']].plot(lw=1, ax=ax, linestyle='--')
-        # correlation[['accuracy']].plot(lw=1, ax=ax, linestyle='-.')
-        # correlation[['f1_score']].plot(lw=1, ax=ax, linestyle=(0, (5, 10)))
-        # correlation[['calinski_harabasz']].plot(
-        #     secondary_y=True, ax=ax, lw=.5)
-        # plt.savefig(
-        #     os.path.join(
-        #         input_dir,
-        #         'dataset_analysis' +
-        #         start_time +
-        #         '_plot.png'),
-        #     format='png', dpi=900)
-
-        objective_space = correlation[['accuracy', 'f1_score', 'ratkowsky_lance']]
-        objective_space.drop_duplicates()
-        objective_space = objective_space.apply(
-                        lambda x: x.map(lambda y: y+random.random()/500))
-        # plt.figure()
-        # points = plt.scatter(objective_space['accuracy'],
-        #                     objective_space['f1_score'],
-        #                     c=objective_space['ratkowsky_lance'],
-        #                     s=3, cmap='viridis', alpha=0.7)
-        # plt.colorbar(points, label='ratkowsky_lance')
-        # sns.regplot("accuracy", "f1_score", data=objective_space, scatter=False)
-        # plt.savefig(
-        #     os.path.join(
-        #         input_dir,
-        #         'dataset_analysis' +
-        #         start_time +
-        #         '_objective_space.png'),
-        #     format='png', dpi=900)
 
     output_summary.write(own_script_text)
 
