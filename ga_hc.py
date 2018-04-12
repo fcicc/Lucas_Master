@@ -73,7 +73,7 @@ r('''
         intIdx
     }
     ''')
-def evall_all_metrics(X, y, ac, samples_dist_matrix, individual):
+def evall_rate_metrics(X, y, ac, samples_dist_matrix, individual):
     """Evaluate individual according multiple metrics and scores."""
     pred = ac.fit(X*individual).labels_
 
@@ -133,7 +133,7 @@ def argument_parser():
                         help='wether to use features attributes as categorical individual data')
     parser.add_argument('-p', '--perfect', action='store_true',
                         help='wether to use the perfect evaluation function')
-    parser.add_argument('-e', '--evall-all', type=float,
+    parser.add_argument('-e', '--evall-rate', type=float,
                         help='rate of best individuals to calculate all metrics')
 
     args = parser.parse_args()
@@ -224,7 +224,7 @@ def main():
             '.txt'),
         'w')
 
-    population_rate = math.ceil(args.evall_all * args.pop_size)
+    population_rate = math.ceil(args.evall_rate * args.pop_size)
 
     output_summary.write(str(args) + '\n')
 
@@ -254,8 +254,7 @@ def main():
 
     alg_parameters = {'n_clusters': [args.n_clusters],
                       'affinity': ['manhattan'],
-                      'linkage': ['complete']
-                      }
+                      'linkage': ['complete']}
     alg_parameters = ParameterGrid(alg_parameters)
     ac = cluster.AgglomerativeClustering(n_clusters=args.n_clusters,
                                          affinity='manhattan',
@@ -293,7 +292,7 @@ def main():
 
     if population_rate:
         best_population = list(tools.selBest(population, k=population_rate))
-        correlation = list(pool.map(partial(evall_all_metrics, X_matrix, y, ac, samples_dist_matrix), best_population))
+        correlation = list(pool.map(partial(evall_rate_metrics, X_matrix, y, ac, samples_dist_matrix), best_population))
     
     NGEN = args.num_gen
     top = []
@@ -304,9 +303,9 @@ def main():
         for fit, ind in zip(fits, offspring):
             ind.fitness.values = fit
 
-        if args.evall_all:
+        if args.evall_rate:
             best_offspring = list(tools.selBest(offspring, k=population_rate))
-            best_fits = pool.map(partial(evall_all_metrics, X_matrix, y, ac, samples_dist_matrix), best_offspring)
+            best_fits = pool.map(partial(evall_rate_metrics, X_matrix, y, ac, samples_dist_matrix), best_offspring)
             correlation += best_fits
 
         old_top = top
@@ -367,7 +366,7 @@ def main():
             start_time +
             '_confusion_matrix.csv'))
 
-    if args.evall_all:
+    if args.evall_rate:
         correlation=pd.DataFrame.from_dict(correlation)
         correlation = correlation.drop_duplicates()
         criteria_names = list(map(lambda x: str(x).lower(), r('getCriteriaNames(TRUE)')))
