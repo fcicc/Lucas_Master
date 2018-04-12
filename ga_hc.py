@@ -11,6 +11,7 @@ import re
 import shutil
 import sys
 import time
+import math
 from functools import partial
 from multiprocessing.pool import Pool
 
@@ -132,8 +133,8 @@ def argument_parser():
                         help='wether to use features attributes as categorical individual data')
     parser.add_argument('-p', '--perfect', action='store_true',
                         help='wether to use the perfect evaluation function')
-    parser.add_argument('-e', '--evall-all', action='store_true',
-                        help='wether to use all evaluation metrics available')
+    parser.add_argument('-e', '--evall-all', type=float,
+                        help='rate of best individuals to calculate all metrics')
 
     args = parser.parse_args()
 
@@ -223,6 +224,8 @@ def main():
             '.txt'),
         'w')
 
+    population_rate = math.ceil(args.evall_all * args.pop_size)
+
     output_summary.write(str(args) + '\n')
 
     output_summary.write('\n\nARGS = ' + str(args) + '\n')
@@ -288,9 +291,9 @@ def main():
     for fit, ind in zip(fits, population):
         ind.fitness.values = fit
 
-    if args.evall_all:
-        correlation = list(pool.map(partial(evall_all_metrics, X_matrix, y, ac, samples_dist_matrix),
-                       toolbox.select(population, k=10)))
+    if population_rate:
+        best_population = list(tools.selBest(population, k=population_rate))
+        correlation = list(pool.map(partial(evall_all_metrics, X_matrix, y, ac, samples_dist_matrix), best_population))
     
     NGEN = args.num_gen
     top = []
@@ -302,9 +305,8 @@ def main():
             ind.fitness.values = fit
 
         if args.evall_all:
-            best_offspring = list(tools.selBest(offspring, k=10))
-            best_fits = pool.map(partial(evall_all_metrics, X_matrix, y, ac, samples_dist_matrix),
-                                best_offspring)
+            best_offspring = list(tools.selBest(offspring, k=population_rate))
+            best_fits = pool.map(partial(evall_all_metrics, X_matrix, y, ac, samples_dist_matrix), best_offspring)
             correlation += best_fits
 
         old_top = top
