@@ -291,8 +291,8 @@ def main():
         ind.fitness.values = fit
 
     if population_rate:
-        best_population = list(tools.selBest(population, k=population_rate))
-        correlation = list(pool.map(partial(evall_rate_metrics, X_matrix, y, ac, samples_dist_matrix), best_population))
+        sample_population = random.choices(population, k=population_rate)
+        correlation = list(pool.map(partial(evall_rate_metrics, X_matrix, y, ac, samples_dist_matrix), sample_population))
     
     NGEN = args.num_gen
     top = []
@@ -306,7 +306,7 @@ def main():
             ind.fitness.values = fit
 
         if args.evall_rate:
-            best_offspring = list(tools.selBest(offspring, k=population_rate))
+            sample_offspring = random.choices(offspring, k=population_rate)
             best_fits = pool.map(partial(evall_rate_metrics, X_matrix, y, ac, samples_dist_matrix), best_offspring)
             correlation += best_fits
 
