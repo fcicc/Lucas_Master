@@ -193,7 +193,7 @@ def clear_incomplete_experiments(directory):
                 os.remove(run_file)
 
 
-def remove_duplicates(iter_a, toolbox):
+def replace_duplicates(iter_a, toolbox):
     seen = []
     init_len = len(iter_a)
     final_len = init_len
@@ -299,7 +299,7 @@ def main():
     for gen in tqdm(range(NGEN)):
         offspring = algorithms.varAnd(
             population, toolbox, cxpb=0.5, mutpb=0.5)
-        remove_duplicates(offspring, toolbox)
+        replace_duplicates(offspring, toolbox)
 
         fits = toolbox.map(toolbox.evaluate, offspring)
         for fit, ind in zip(fits, offspring):
