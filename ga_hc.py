@@ -299,6 +299,8 @@ def main():
     for gen in tqdm(range(NGEN)):
         offspring = algorithms.varAnd(
             population, toolbox, cxpb=0.5, mutpb=0.5)
+        remove_duplicates(offspring, toolbox)
+
         fits = toolbox.map(toolbox.evaluate, offspring)
         for fit, ind in zip(fits, offspring):
             ind.fitness.values = fit
@@ -314,7 +316,6 @@ def main():
         else:
             top = tools.selBest(offspring + top, k=1)
 
-        remove_duplicates(population, toolbox)
         population = toolbox.select(offspring+population, k=len(population))
 
     top = top[0]
@@ -368,7 +369,6 @@ def main():
 
     if args.evall_rate:
         correlation=pd.DataFrame.from_dict(correlation)
-        correlation = correlation.drop_duplicates()
         criteria_names = list(map(lambda x: str(x).lower(), r('getCriteriaNames(TRUE)')))
         correlation.columns= criteria_names + [
             'accuracy', 'f1_score', 'adjusted_rand_score']
@@ -379,13 +379,6 @@ def main():
                         'dataset_analysis' +
                         start_time +
                         '_metrics.csv'),
-            float_format='%.10f',
-            index=True)
-        correlation.corr().to_csv(
-            os.path.join(input_dir,
-                        'dataset_analysis' +
-                        start_time +
-                        '_metrics_correlation.csv'),
             float_format='%.10f',
             index=True)
 
