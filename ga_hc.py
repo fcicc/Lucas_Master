@@ -49,8 +49,9 @@ r('''
 def eval_features(X, ac, individual):
     """Evaluate individual according to silhouette score."""
     pred = ac.fit(X*individual).labels_
-    index1 = r['unique_criteria'](X, pred, 'Wemmert_Gancarski')
-    index1 = np.asarray(index1)[0][0]
+    # index1 = r['unique_criteria'](X, pred, 'Wemmert_Gancarski')
+    # index1 = np.asarray(index1)[0][0]
+    index1 = silhouette_score(X, pred)
 
     return (index1,)
 
@@ -307,8 +308,8 @@ def main():
 
         if args.evall_rate:
             sample_offspring = random.choices(offspring, k=population_rate)
-            best_fits = pool.map(partial(evall_rate_metrics, X_matrix, y, ac, samples_dist_matrix), best_offspring)
-            correlation += best_fits
+            sample_fits = pool.map(partial(evall_rate_metrics, X_matrix, y, ac, samples_dist_matrix), sample_offspring)
+            correlation += sample_fits
 
         old_top = top
         if top == []:
