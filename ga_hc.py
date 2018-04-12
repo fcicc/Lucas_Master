@@ -49,6 +49,7 @@ def eval_features(X, ac, individual):
     """Evaluate individual according to silhouette score."""
     pred = ac.fit(X*individual).labels_
     index1 = r['unique_criteria'](X, pred, 'Wemmert_Gancarski')
+    index1 = np.asarray(index1)[0][0]
 
     return (index1,)
 
@@ -191,6 +192,21 @@ def clear_incomplete_experiments(directory):
                 os.remove(run_file)
 
 
+def remove_duplicates(iter_a, toolbox):
+    seen = []
+    init_len = len(iter_a)
+    final_len = init_len
+    while init_len != final_len:
+        iter_a += toolbox.population(n=(init_len-final_len))
+        for i, item in enumerate(iter_a):
+            if item in seen:
+                del iter_a[i]
+                print('REMOVED')
+            seen.append(item)
+        final_len = len(iter_a)
+    
+    return
+
 def main():
     """Main function."""
     args = argument_parser()
@@ -297,6 +313,7 @@ def main():
         else:
             top = tools.selBest(offspring + top, k=1)
 
+        remove_duplicates(population, toolbox)
         population = toolbox.select(offspring+population, k=len(population))
 
     top = top[0]
