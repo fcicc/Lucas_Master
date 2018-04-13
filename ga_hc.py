@@ -83,11 +83,12 @@ def evall_rate_metrics(X, y, ac, samples_dist_matrix, individual):
     int_idx = r['all_intern_metrics'](X, pred)
     int_idx = [val[0] for val in list(int_idx)]
 
+    silhouette = silhouette_score(X, pred)
     adj_rand = adjusted_rand_score(y, pred)
     f1 = f1_score(y, y_pred, average='weighted')
     acc = accuracy_score(y, y_pred)
 
-    return tuple(int_idx) + (acc, f1, adj_rand)
+    return tuple(int_idx) + (acc, f1, adj_rand, silhouette)
 
 
 def feature_relevance(X, y):
@@ -372,7 +373,7 @@ def main():
         correlation=pd.DataFrame.from_dict(correlation)
         criteria_names = list(map(lambda x: str(x).lower(), r('getCriteriaNames(TRUE)')))
         correlation.columns= criteria_names + [
-            'accuracy', 'f1_score', 'adjusted_rand_score']
+            'accuracy', 'f1_score', 'adjusted_rand_score', 'silhouette_sklearn']
         correlation = correlation.reset_index(drop=True)
 
         correlation.to_csv(
