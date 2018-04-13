@@ -284,7 +284,7 @@ def main():
         toolbox.register("evaluate", eval_features, X_matrix, ac)
     toolbox.register("mate", tools.cxUniform, indpb=0.5)
     toolbox.register("mutate", tools.mutFlipBit, indpb=0.5)
-    toolbox.register("select", tools.selNSGA2)
+    toolbox.register("select", tools.selRoulette)
 
     population = toolbox.population(n=args.pop_size)
     fits = toolbox.map(toolbox.evaluate, population)
