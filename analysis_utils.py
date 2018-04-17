@@ -16,7 +16,6 @@ def argument_parser():
     parser.add_argument('-p', '--plot-correlation', action='store_true', help='plot correlation')
     parser.add_argument('--axis1', type=str, help='''first plot axis''')
     parser.add_argument('--axis2', type=str, help='''second plot axis''')
-    parser.add_argument('--color', type=str, help='''color axis''')
     parser.add_argument('-c', '--correlation', action='store_true', help='generates correlation matrix')
 
     args = parser.parse_args()
@@ -31,9 +30,9 @@ def plot_correlation(df, args):
     plt.figure()
     points = plt.scatter(df[args.axis1],
                         df[args.axis2],
-                        c=df[args.color],
+                        c=df.index.values,
                         s=3, cmap='viridis', alpha=0.7)
-    plt.colorbar(points, label=args.color)
+    plt.colorbar(points, label='index')
     sns.regplot(args.axis1, args.axis2, data=df, scatter=False, x_jitter=0.05, y_jitter=0.05, order=1, robust=False)
 
     if args.output_file:
@@ -62,4 +61,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    
