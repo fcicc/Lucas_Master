@@ -332,24 +332,29 @@ def main():
     MRs = feature_relevance(X, y)
     result = pd.concat([result, MRs], axis=1, join='inner')
     result = result.sort_values('std', ascending=False)
+    initial_n_features = X_matrix.shape[1]
+    final_n_features = len(best_features)
+    feature_reduction_rate = final_n_features/initial_n_features
 
     y_pred = class_cluster_match(y, best_pred)
     cm = confusion_matrix(y, y_pred)
     cm = pd.DataFrame(data=cm, index=unique_labels(y),
                       columns=unique_labels(best_pred))
 
-    output_summary.write('adjusted Rand score: ' +
-                         str(adjusted_rand_score(y, best_pred)) + '\n')
-    output_summary.write('silhouette score: ' +
-                         str(silhouette_score(X[best_features], best_pred)) +
-                         '\n')
-    output_summary.write('calinski harabaz score: ' +
-                         str(calinski_harabaz_score(X[best_features],
-                             best_pred)) + '\n')
-    output_summary.write('accuracy score: ' +
-                         str(accuracy_score(y, y_pred)) + '\n')
-    output_summary.write(
-        'f1 score: ' + str(f1_score(y, y_pred, average='weighted')) + '\n',)
+    result_summary = {'initial number of features': [initial_n_features],
+                      'feature reduction rate' : [feature_reduction_rate],
+                      'final number of features:' [final_n_features],
+                      'adjusted Rand score' : [adjusted_rand_score(y, best_pred)],
+                      'silhouette score' : [silhouette_score(X[best_features], best_pred)],
+                      'calinski harabaz score' : [calinski_harabaz_score(X[best_features], best_pred)],
+                      'accuracy score' : [accuracy_score(y, y_pred)],
+                      'f1 score' : [f1_score(y, y_pred, average='weighted')]}
+                      
+    result_summary = pd.DataFrame.from_dict(result_summary)
+    with pd.option_context('display.max_rows', None, 'display.max_columns',
+                           None, 'display.max_colwidth', 10000,
+                           'display.width', 1000, 'display.height', 1000):
+        output_summary.write(str(result_summary) + '\n')
 
     output_summary.write('confusion matrix:' + '\n')
     with pd.option_context('display.max_rows', None, 'display.max_columns',
