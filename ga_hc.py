@@ -326,7 +326,7 @@ def main():
 
     result_summary = {'initial number of features': [initial_n_features],
                       'feature reduction rate' : [feature_reduction_rate],
-                      'final number of features:' [final_n_features],
+                      'final number of features' : [final_n_features],
                       'adjusted Rand score' : [adjusted_rand_score(y, best_pred)],
                       'silhouette score' : [silhouette_score(X[best_features], best_pred)],
                       'calinski harabaz score' : [calinski_harabaz_score(X[best_features], best_pred)],
