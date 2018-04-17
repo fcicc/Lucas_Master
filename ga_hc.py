@@ -192,22 +192,6 @@ def clear_incomplete_experiments(directory):
             for run_file in glob.glob(run_files_regex):
                 os.remove(run_file)
 
-
-def replace_duplicates(iter_a, toolbox):
-    seen = []
-    init_len = len(iter_a)
-    final_len = init_len
-    while init_len != final_len:
-        iter_a += toolbox.population(n=(init_len-final_len))
-        for i, item in enumerate(iter_a):
-            if item in seen:
-                del iter_a[i]
-                print('REMOVED')
-            seen.append(item)
-        final_len = len(iter_a)
-
-    return
-
 def main():
     """Main function."""
     args = argument_parser()
@@ -295,7 +279,6 @@ def main():
     for gen in tqdm(range(NGEN)):
         offspring = algorithms.varAnd(
             population, toolbox, cxpb=0.5, mutpb=0.5)
-        replace_duplicates(offspring, toolbox)
 
         fits = toolbox.map(toolbox.evaluate, offspring)
         for fit, ind in zip(fits, offspring):
@@ -349,7 +332,7 @@ def main():
                       'calinski harabaz score' : [calinski_harabaz_score(X[best_features], best_pred)],
                       'accuracy score' : [accuracy_score(y, y_pred)],
                       'f1 score' : [f1_score(y, y_pred, average='weighted')]}
-                      
+
     result_summary = pd.DataFrame.from_dict(result_summary)
     with pd.option_context('display.max_rows', None, 'display.max_columns',
                            None, 'display.max_colwidth', 10000,
