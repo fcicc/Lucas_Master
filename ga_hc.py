@@ -125,8 +125,6 @@ def argument_parser():
         type=str,
         help='''input CSV file"
              ''')
-    parser.add_argument('n_clusters', type=int,
-                        help='number of desired clusters')
     parser.add_argument('--num-gen', type=int, default=500,
                         help='number of generations')
     parser.add_argument('--pop-size', type=int, default=600,
@@ -158,7 +156,7 @@ def extract_subtotals(X):
         for i, attribute in enumerate(feature_attrs):
             if attribute not in attributes[big_group][i]:
                 attributes[big_group][i][attribute] = [0 for _ in range(X.shape[0])]
-    
+
     for i, row in enumerate(X.iterrows()):
         for feature in compositional_features:
             if row[1][feature] > 0:
@@ -207,7 +205,7 @@ def replace_duplicates(iter_a, toolbox):
                 print('REMOVED')
             seen.append(item)
         final_len = len(iter_a)
-    
+
     return
 
 def main():
@@ -254,11 +252,7 @@ def main():
 
     samples_dist_matrix = distance.squareform(distance.pdist(X_matrix))
 
-    alg_parameters = {'n_clusters': [args.n_clusters],
-                      'affinity': ['manhattan'],
-                      'linkage': ['complete']}
-    alg_parameters = ParameterGrid(alg_parameters)
-    ac = cluster.AgglomerativeClustering(n_clusters=args.n_clusters,
+    ac = cluster.AgglomerativeClustering(n_clusters=len(unique_labels(y)),
                                          affinity='manhattan',
                                          linkage='complete')
 
@@ -295,7 +289,7 @@ def main():
     if population_rate:
         sample_population = random.choices(population, k=population_rate)
         correlation = list(pool.map(partial(evall_rate_metrics, X_matrix, y, ac, samples_dist_matrix), sample_population))
-    
+
     NGEN = args.num_gen
     top = []
     for gen in tqdm(range(NGEN)):
