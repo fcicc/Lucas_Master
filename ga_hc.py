@@ -135,6 +135,10 @@ def argument_parser():
                         help='wether to use the perfect evaluation function')
     parser.add_argument('-e', '--evall-rate', type=float, default=0,
                         help='rate of best individuals to calculate all metrics')
+    parser.add_argument('--min-features', type=int, default=4,
+                        help='minimum number of features to be considered')
+    parser.add_argument('--max-features' type=int, default=50,
+                        help='maximum number of features to be considered')
 
     args = parser.parse_args()
 
@@ -281,12 +285,12 @@ def main():
         toolbox.register("evaluate", perfect_eval_features, X_matrix, y, ac)
     else:
         toolbox.register("evaluate", eval_features, X_matrix, ac)
-    toolbox.register("mate", tools.cxUniform, indpb=0.5)
-    toolbox.register("mutate", tools.mutFlipBit, indpb=0.5)
+    toolbox.register("mate", tools.cxUniform, indpb=0.1)
+    toolbox.register("mutate", tools.mutFlipBit, indpb=0.01)
     toolbox.register("select", tools.selRoulette)
 
-    toolbox.decorate("mate", checkBounds(4, 50))
-    toolbox.decorate("mutate", checkBounds(4, 50))
+    toolbox.decorate("mate", checkBounds(args.min_features, args.max_features))
+    toolbox.decorate("mutate", checkBounds(args.min_features, args.max_features))
 
     population = toolbox.population(n=args.pop_size)
     fits = toolbox.map(toolbox.evaluate, population)
