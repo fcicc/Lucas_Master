@@ -87,8 +87,9 @@ def evall_rate_metrics(X, y, ac, samples_dist_matrix, individual):
     adj_rand = adjusted_rand_score(y, pred)
     f1 = f1_score(y, y_pred, average='weighted')
     acc = accuracy_score(y, y_pred)
+    complexity = int(np.sum(individual))
 
-    return tuple(int_idx) + (acc, f1, adj_rand, silhouette)
+    return tuple(int_idx) + (acc, f1, adj_rand, silhouette, complexity)
 
 
 def feature_relevance(X, y):
