@@ -332,11 +332,11 @@ def main():
                       'accuracy score' : [accuracy_score(y, y_pred)],
                       'f1 score' : [f1_score(y, y_pred, average='weighted')]}
 
-    result_summary = pd.DataFrame.from_dict(result_summary)
+    result_summary = pd.DataFrame.from_dict(result_summary).transpose()
     with pd.option_context('display.max_rows', None, 'display.max_columns',
                            None, 'display.max_colwidth', 10000,
                            'display.width', 1000, 'display.height', 1000):
-        output_summary.write(str(result_summary) + '\n')
+        output_summary.write(result_summary.to_string(header=False) + '\n')
 
     output_summary.write('confusion matrix:' + '\n')
     with pd.option_context('display.max_rows', None, 'display.max_columns',
