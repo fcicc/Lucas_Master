@@ -272,7 +272,7 @@ def main():
     pool = Pool(multiprocessing.cpu_count())
     toolbox.register("map", pool.map)
 
-    toolbox.register("attr_bool", random.choice, [1, 0])
+    toolbox.register("attr_bool", random.choice, [1, 0], p=[0.1, 0.9])
     toolbox.register(
         "individual",
         tools.initRepeat,
@@ -304,7 +304,7 @@ def main():
     NGEN = args.num_gen
     top = []
     for gen in tqdm(range(NGEN)):
-        offspring = algorithms.varAnd(population, toolbox, cxpb=0.5, mutpb=0.5)
+        offspring = algorithms.varOr(population, toolbox, cxpb=0.2, mutpb=0.8)
 
         fits = toolbox.map(toolbox.evaluate, offspring)
         for fit, ind in zip(fits, offspring):
