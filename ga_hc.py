@@ -133,7 +133,7 @@ def argument_parser():
                         help='wether to use features attributes as categorical individual data')
     parser.add_argument('-p', '--perfect', action='store_true',
                         help='wether to use the perfect evaluation function')
-    parser.add_argument('-e', '--evall-rate', type=float,
+    parser.add_argument('-e', '--evall-rate', type=float, default=0,
                         help='rate of best individuals to calculate all metrics')
 
     args = parser.parse_args()
@@ -293,8 +293,8 @@ def main():
     for fit, ind in zip(fits, population):
         ind.fitness.values = fit
 
-    if population_rate:
-        sample_population = random.choices(population, k=population_rate)
+    if args.evall_rate:
+        sample_population = random.sample(population, population_rate)
         correlation = list(pool.map(partial(evall_rate_metrics, X_matrix, y, ac, samples_dist_matrix), sample_population))
 
     NGEN = args.num_gen
@@ -308,7 +308,7 @@ def main():
             ind.fitness.values = fit
 
         if args.evall_rate:
-            sample_offspring = random.choices(offspring, k=population_rate)
+            sample_offspring = random.sample(offspring, population_rate)
             sample_fits = pool.map(partial(evall_rate_metrics, X_matrix, y, ac, samples_dist_matrix), sample_offspring)
             correlation += sample_fits
 
