@@ -211,8 +211,7 @@ def main():
     population_rate = math.ceil(args.evall_rate * args.pop_size)
 
     output_summary.write(str(args) + '\n')
-
-    output_summary.write('\n\nARGS = ' + str(args) + '\n')
+    
     own_script = open(sys.argv[0])
     own_script_text = own_script.read()
     own_script.close()
