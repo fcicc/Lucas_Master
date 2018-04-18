@@ -220,6 +220,7 @@ def clear_incomplete_experiments(directory):
 
 
 def weighted_flipBit(individual, negative_w):
+    """FlipBit from deap with negative_w more chances of turning 1 to 0, than the reverse"""
     for i, _ in enumerate(individual):
         if individual[i]:
             if random.random() < negative_w:
@@ -362,7 +363,7 @@ def main():
     cm = pd.DataFrame(data=cm, index=unique_labels(y),
                       columns=unique_labels(best_pred))
 
-    output_summary.write("SUMMARY:")
+    output_summary.write("SUMMARY:\n")
     result_summary = {'initial number of features': [initial_n_features],
                       'feature reduction rate' : [feature_reduction_rate],
                       'final number of features' : [final_n_features],
