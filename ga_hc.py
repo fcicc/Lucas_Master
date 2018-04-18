@@ -137,7 +137,7 @@ def argument_parser():
                         help='rate of best individuals to calculate all metrics')
     parser.add_argument('--min-features', type=int, default=4,
                         help='minimum number of features to be considered')
-    parser.add_argument('--max-features' type=int, default=50,
+    parser.add_argument('--max-features', type=int, default=50,
                         help='maximum number of features to be considered')
 
     args = parser.parse_args()
