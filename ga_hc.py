@@ -362,6 +362,7 @@ def main():
     cm = pd.DataFrame(data=cm, index=unique_labels(y),
                       columns=unique_labels(best_pred))
 
+    output_summary.write("SUMMARY:")
     result_summary = {'initial number of features': [initial_n_features],
                       'feature reduction rate' : [feature_reduction_rate],
                       'final number of features' : [final_n_features],
@@ -375,7 +376,7 @@ def main():
     with pd.option_context('display.max_rows', None, 'display.max_columns',
                            None, 'display.max_colwidth', 10000,
                            'display.width', 1000, 'display.height', 1000):
-        output_summary.write(result_summary.to_string(header=False) + '\n')
+        output_summary.write(result_summary.to_string(header=False) + '\n\n')
 
     output_summary.write('confusion matrix:' + '\n')
     with pd.option_context('display.max_rows', None, 'display.max_columns',
@@ -393,7 +394,7 @@ def main():
         correlation=pd.DataFrame.from_dict(correlation)
         criteria_names = list(map(lambda x: str(x).lower(), r('getCriteriaNames(TRUE)')))
         correlation.columns= criteria_names + [
-            'accuracy', 'f1_score', 'adjusted_rand_score', 'silhouette_sklearn']
+            'accuracy', 'f1_score', 'adjusted_rand_score', 'silhouette_sklearn', 'complexity']
         correlation = correlation.reset_index(drop=True)
 
         correlation.to_csv(
