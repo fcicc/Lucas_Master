@@ -304,8 +304,7 @@ def main():
     NGEN = args.num_gen
     top = []
     for gen in tqdm(range(NGEN)):
-        offspring = algorithms.varAnd(
-            population, toolbox, cxpb=0.5, mutpb=0.5)
+        offspring = algorithms.varAnd(population, toolbox, cxpb=0.5, mutpb=0.5)
 
         fits = toolbox.map(toolbox.evaluate, offspring)
         for fit, ind in zip(fits, offspring):
