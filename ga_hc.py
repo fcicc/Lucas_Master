@@ -176,6 +176,27 @@ def extract_subtotals(X):
 
     return df
 
+def checkBounds(min, max):
+    def decorator(func):
+        def wrapper(*args, **kargs):
+            offspring = func(*args, **kargs)
+            for child in offspring:
+                used_features = int(np.sum(child))
+                if used_features > max:
+                    extra_features =  used_features - max
+                    used_features_idx = np.flatnonzero(child==1).tolist()
+                    turn_off_idx = random.sample(used_features_idx, extra_features)
+                    child[turn_off_idx] = 0
+                elif used_features < min:
+                    missing_features = min - used_features
+                    unused_features_idx = np.flatnonzero(child==0).tolist()
+                    turn_on_idx = random.sample(unused_features_idx, missing_features)
+                    child[turn_on_idx] = 1
+
+            return offspring
+        return wrapper
+    return decorator
+
 
 def clear_incomplete_experiments(directory):
     """Search the input directory for incomplete run files and erase them."""
@@ -240,7 +261,7 @@ def main():
                                          linkage='complete')
 
     creator.create("FitnessMax", base.Fitness, weights=(1, ))
-    creator.create("Individual", list, fitness=creator.FitnessMax)
+    creator.create("Individual", np.ndarray, fitness=creator.FitnessMax)
 
     toolbox = base.Toolbox()
 
@@ -263,6 +284,9 @@ def main():
     toolbox.register("mate", tools.cxUniform, indpb=0.5)
     toolbox.register("mutate", tools.mutFlipBit, indpb=0.5)
     toolbox.register("select", tools.selRoulette)
+
+    toolbox.decorate("mate", checkBounds(4, 50))
+    toolbox.decorate("mutate", checkBounds(4, 50))
 
     population = toolbox.population(n=args.pop_size)
     fits = toolbox.map(toolbox.evaluate, population)
