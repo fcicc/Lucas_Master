@@ -217,6 +217,17 @@ def clear_incomplete_experiments(directory):
             for run_file in glob.glob(run_files_regex):
                 os.remove(run_file)
 
+
+def weighted_flipBit(individual, negative_w):
+    for i, _ in enumerate(individual):
+        if individual[i]:
+            if random.random() < negative_w:
+                individual[i] = 0
+        else:
+            if random.random() > negative_w:
+                individual[i] = 1                
+    return individual,
+
 def main():
     """Main function."""
     args = argument_parser()
@@ -272,7 +283,7 @@ def main():
     pool = Pool(multiprocessing.cpu_count())
     toolbox.register("map", pool.map)
 
-    toolbox.register("attr_bool", random.choice, [1, 0], p=[0.1, 0.9])
+    toolbox.register("attr_bool", lambda : random.choices([1, 0], weights=[0.01, 0.99], k=1)[0])
     toolbox.register(
         "individual",
         tools.initRepeat,
@@ -286,7 +297,7 @@ def main():
     else:
         toolbox.register("evaluate", eval_features, X_matrix, ac)
     toolbox.register("mate", tools.cxUniform, indpb=0.1)
-    toolbox.register("mutate", tools.mutFlipBit, indpb=0.01)
+    toolbox.register("mutate", weighted_flipBit, negative_w=0.9)
     toolbox.register("select", tools.selRoulette)
 
     toolbox.decorate("mate", checkBounds(args.min_features, args.max_features))
@@ -304,7 +315,7 @@ def main():
     NGEN = args.num_gen
     top = []
     for gen in tqdm(range(NGEN)):
-        offspring = algorithms.varOr(population, toolbox, cxpb=0.2, mutpb=0.8)
+        offspring = algorithms.varOr(population, toolbox, args.pop_size, cxpb=0.2, mutpb=0.8)
 
         fits = toolbox.map(toolbox.evaluate, offspring)
         for fit, ind in zip(fits, offspring):
