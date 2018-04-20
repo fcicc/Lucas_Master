@@ -46,12 +46,12 @@ r('''
         intIdx
     }
     ''')
-def eval_features(X, ac, individual):
+def eval_features(X, ac, metric, individual):
     """Evaluate individual according to silhouette score."""
     pred = ac.fit(X*individual).labels_
-    # index1 = r['unique_criteria'](X, pred, 'Wemmert_Gancarski')
+    index1 = r['unique_criteria'](X, pred, metric)
     # index1 = np.asarray(index1)[0][0]
-    index1 = silhouette_score(X, pred)
+    # index1 = silhouette_score(X, pred)
 
     return (index1,)
 
@@ -121,11 +121,7 @@ def argument_parser():
     parser = argparse.ArgumentParser(
         description='''Code implementation from "A Clustering-based Approach to
                        Identify Petrofacies from Petrographic Data".''')
-    parser.add_argument(
-        'input_file',
-        type=str,
-        help='''input CSV file"
-             ''')
+    parser.add_argument('input_file', type=str, help='''input CSV file''')
     parser.add_argument('--num-gen', type=int, default=500,
                         help='number of generations')
     parser.add_argument('--pop-size', type=int, default=600,
@@ -140,6 +136,8 @@ def argument_parser():
                         help='minimum number of features to be considered')
     parser.add_argument('--max-features', type=int, default=50,
                         help='maximum number of features to be considered')
+    parser.add_argument('--fitness-metric', type=str, default='silhouette',
+                        help='fitness function to be used from the clusterCrit R package')
 
     args = parser.parse_args()
 
@@ -297,7 +295,7 @@ def main():
     if args.perfect:
         toolbox.register("evaluate", perfect_eval_features, X_matrix, y, ac)
     else:
-        toolbox.register("evaluate", eval_features, X_matrix, ac)
+        toolbox.register("evaluate", eval_features, X_matrix, ac, fitness_metric)
     toolbox.register("mate", tools.cxUniform, indpb=0.1)
     toolbox.register("mutate", weighted_flipBit, negative_w=0.9)
     toolbox.register("select", tools.selRoulette)
