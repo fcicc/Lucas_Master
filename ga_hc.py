@@ -295,7 +295,7 @@ def main():
     if args.perfect:
         toolbox.register("evaluate", perfect_eval_features, X_matrix, y, ac)
     else:
-        toolbox.register("evaluate", eval_features, X_matrix, ac, fitness_metric)
+        toolbox.register("evaluate", eval_features, X_matrix, ac, args.fitness_metric)
     toolbox.register("mate", tools.cxUniform, indpb=0.1)
     toolbox.register("mutate", weighted_flipBit, negative_w=0.9)
     toolbox.register("select", tools.selRoulette)
