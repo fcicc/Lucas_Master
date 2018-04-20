@@ -50,7 +50,7 @@ def eval_features(X, ac, metric, individual):
     """Evaluate individual according to silhouette score."""
     pred = ac.fit(X*individual).labels_
     index1 = r['unique_criteria'](X, pred, metric)
-    # index1 = np.asarray(index1)[0][0]
+    index1 = np.asarray(index1)[0][0]
     # index1 = silhouette_score(X, pred)
 
     return (index1,)
