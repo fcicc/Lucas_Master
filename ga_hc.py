@@ -49,9 +49,11 @@ r('''
 def eval_features(X, ac, metric, individual):
     """Evaluate individual according to silhouette score."""
     pred = ac.fit(X*individual).labels_
-    index1 = r['unique_criteria'](X, pred, metric)
-    index1 = np.asarray(index1)[0][0]
-    # index1 = silhouette_score(X, pred)
+    if metric != 'silhouette_sklearn':
+        index1 = r['unique_criteria'](X, pred, metric)
+        index1 = np.asarray(index1)[0][0]
+    else:
+        index1 = silhouette_score(X, pred)
 
     return (index1,)
 
@@ -217,14 +219,14 @@ def clear_incomplete_experiments(directory):
                 os.remove(run_file)
 
 
-def weighted_flipBit(individual, negative_w):
+def weighted_flipBit(variance_per_feature, individual):
     """FlipBit from deap with negative_w more chances of turning 1 to 0, than the reverse"""
     for i, _ in enumerate(individual):
         if individual[i]:
-            if random.random() < negative_w:
+            if random.random() > variance_per_feature[i]:
                 individual[i] = 0
         else:
-            if random.random() > negative_w:
+            if random.random() < variance_per_feature[i]:
                 individual[i] = 1                
     return individual,
 
@@ -267,6 +269,9 @@ def main():
     X = X.reset_index(drop=True)
     X_matrix = X.as_matrix()
 
+    variance_per_feature = X_matrix.var(axis=0)
+    variance_per_feature[np.nonzero(variance_per_feature > 0.95)] = 0.95
+
     logging.info(args)
 
     samples_dist_matrix = distance.squareform(distance.pdist(X_matrix))
@@ -280,8 +285,8 @@ def main():
 
     toolbox = base.Toolbox()
 
-    pool = Pool(multiprocessing.cpu_count())
-    toolbox.register("map", pool.map)
+    # pool = Pool(multiprocessing.cpu_count())
+    # toolbox.register("map", pool.map)
 
     toolbox.register("attr_bool", lambda : random.choices([1, 0], weights=[0.01, 0.99], k=1)[0])
     toolbox.register(
@@ -297,7 +302,7 @@ def main():
     else:
         toolbox.register("evaluate", eval_features, X_matrix, ac, args.fitness_metric)
     toolbox.register("mate", tools.cxUniform, indpb=0.1)
-    toolbox.register("mutate", weighted_flipBit, negative_w=0.9)
+    toolbox.register("mutate", weighted_flipBit, variance_per_feature)
     toolbox.register("select", tools.selRoulette)
 
     toolbox.decorate("mate", checkBounds(args.min_features, args.max_features))
@@ -310,20 +315,19 @@ def main():
 
     if args.evall_rate:
         sample_population = random.sample(population, population_rate)
-        correlation = list(pool.map(partial(evall_rate_metrics, X_matrix, y, ac, samples_dist_matrix), sample_population))
+        correlation = list(toolbox.map(partial(evall_rate_metrics, X_matrix, y, ac, samples_dist_matrix), sample_population))
 
     NGEN = args.num_gen
     top = []
     for gen in tqdm(range(NGEN)):
         offspring = algorithms.varOr(population, toolbox, args.pop_size, cxpb=0.2, mutpb=0.8)
-
         fits = toolbox.map(toolbox.evaluate, offspring)
         for fit, ind in zip(fits, offspring):
             ind.fitness.values = fit
 
         if args.evall_rate:
             sample_offspring = random.sample(offspring, population_rate)
-            sample_fits = pool.map(partial(evall_rate_metrics, X_matrix, y, ac, samples_dist_matrix), sample_offspring)
+            sample_fits = toolbox.map(partial(evall_rate_metrics, X_matrix, y, ac, samples_dist_matrix), sample_offspring)
             correlation += sample_fits
 
         old_top = top
