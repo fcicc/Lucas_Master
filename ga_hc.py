@@ -138,7 +138,7 @@ def argument_parser():
                         help='minimum number of features to be considered')
     parser.add_argument('--max-features', type=int, default=50,
                         help='maximum number of features to be considered')
-    parser.add_argument('--fitness-metric', type=str, default='silhouette',
+    parser.add_argument('--fitness-metric', type=str, default='silhouette_sklearn',
                         help='fitness function to be used from the clusterCrit R package')
 
     args = parser.parse_args()
