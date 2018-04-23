@@ -143,6 +143,14 @@ def argument_parser():
 
     args = parser.parse_args()
 
+    if args.fitness_metric not in ['Banfeld_Raftery','C_index','Calinski_Harabasz',
+        'Davies_Bouldin','Dunn','Gamma','G_plus','GDI11','GDI12','GDI13','GDI21',
+        'GDI22','GDI23','GDI31','GDI32','GDI33','GDI41','GDI42','GDI43','GDI51',
+        'GDI52','GDI53','McClain_Rao','PBM','Point_Biserial','Ray_Turi',
+        'Ratkowsky_Lance','SD_Scat','SD_Dis','Silhouette','Tau','Wemmert_Gancarski',
+        'Xie_Beni','silhouette_sklearn']:
+        raise ValueError(args.fitness_metric + ' is not an acceptable fitness metric')
+
     return args
 
 
@@ -285,7 +293,7 @@ def main():
         'GDI33','GDI41','GDI42','GDI43','GDI51','GDI52','GDI53','PBM',
         'Point_Biserial','Ratkowsky_Lance','Silhouette','Tau',
         'Wemmert_Gancarski', 'silhouette_sklearn']:
-    creator.create("FitnessMax", base.Fitness, weights=(1, ))
+        creator.create("FitnessMax", base.Fitness, weights=(1, ))
     else:
         creator.create("FitnessMax", base.Fitness, weights=(-1, ))
 
@@ -296,7 +304,7 @@ def main():
     pool = Pool(multiprocessing.cpu_count())
     toolbox.register("map", pool.map)
 
-    toolbox.register("attr_bool", lambda : random.choices([1, 0], weights=[0.01, 0.99], k=1)[0])
+    toolbox.register("attr_bool", lambda : 1)
     toolbox.register(
         "individual",
         tools.initRepeat,
