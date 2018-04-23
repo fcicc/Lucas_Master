@@ -69,20 +69,20 @@ def perfect_eval_features(X, y, ac, individual):
     return accuracy_score(y, y_pred), f1_score(y_num, pred, average='weighted')
 
 
-r('''
-    library('clusterCrit')
-    all_intern_metrics <- function(X, labels) {
-        intIdx <- intCriteria(X, as.integer(labels), 'all')
-        intIdx
-    }
-    ''')
 def evall_rate_metrics(X, y, ac, samples_dist_matrix, individual):
     """Evaluate individual according multiple metrics and scores."""
     pred = ac.fit(X*individual).labels_
 
     y_pred = class_cluster_match(y, pred)
 
-    int_idx = r['all_intern_metrics'](X, pred)
+    indexes = ['C_index','Calinski_Harabasz',
+        'Davies_Bouldin','Dunn','Gamma','G_plus','GDI11','GDI12','GDI13','GDI21',
+        'GDI22','GDI23','GDI31','GDI32','GDI33','GDI41','GDI42','GDI43','GDI51',
+        'GDI52','GDI53','McClain_Rao','PBM','Point_Biserial','Ray_Turi',
+        'Ratkowsky_Lance','SD_Scat','SD_Dis','Silhouette','Tau','Wemmert_Gancarski',
+        'Xie_Beni']
+
+    int_idx = r['unique_criteria'](X, pred, indexes)
     int_idx = [val[0] for val in list(int_idx)]
 
     silhouette = silhouette_score(X, pred)
@@ -411,7 +411,12 @@ def main():
 
     if args.evall_rate:
         correlation=pd.DataFrame.from_dict(correlation)
-        criteria_names = list(map(lambda x: str(x).lower(), r('getCriteriaNames(TRUE)')))
+        criteria_names = ['C_index','Calinski_Harabasz',
+        'Davies_Bouldin','Dunn','Gamma','G_plus','GDI11','GDI12','GDI13','GDI21',
+        'GDI22','GDI23','GDI31','GDI32','GDI33','GDI41','GDI42','GDI43','GDI51',
+        'GDI52','GDI53','McClain_Rao','PBM','Point_Biserial','Ray_Turi',
+        'Ratkowsky_Lance','SD_Scat','SD_Dis','Silhouette','Tau','Wemmert_Gancarski',
+        'Xie_Beni']
         correlation.columns= criteria_names + [
             'accuracy', 'f1_score', 'adjusted_rand_score', 'silhouette_sklearn', 'complexity']
         correlation = correlation.reset_index(drop=True)
