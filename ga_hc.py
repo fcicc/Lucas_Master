@@ -280,7 +280,15 @@ def main():
                                          affinity='manhattan',
                                          linkage='complete')
 
+    if args.fitness_metric in ['Calinski_Harabasz','Dunn','Gamma','G_plus',
+        'GDI11','GDI12','GDI13','GDI21','GDI22','GDI23','GDI31','GDI32',
+        'GDI33','GDI41','GDI42','GDI43','GDI51','GDI52','GDI53','PBM',
+        'Point_Biserial','Ratkowsky_Lance','Silhouette','Tau',
+        'Wemmert_Gancarski', 'silhouette_sklearn']:
     creator.create("FitnessMax", base.Fitness, weights=(1, ))
+    else:
+        creator.create("FitnessMax", base.Fitness, weights=(-1, ))
+
     creator.create("Individual", np.ndarray, fitness=creator.FitnessMax)
 
     toolbox = base.Toolbox()
