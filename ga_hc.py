@@ -143,7 +143,7 @@ def argument_parser():
 
     args = parser.parse_args()
 
-    if args.fitness_metric not in ['Banfeld_Raftery','C_index','Calinski_Harabasz',
+    if args.fitness_metric not in ['C_index','Calinski_Harabasz',
         'Davies_Bouldin','Dunn','Gamma','G_plus','GDI11','GDI12','GDI13','GDI21',
         'GDI22','GDI23','GDI31','GDI32','GDI33','GDI41','GDI42','GDI43','GDI51',
         'GDI52','GDI53','McClain_Rao','PBM','Point_Biserial','Ray_Turi',
