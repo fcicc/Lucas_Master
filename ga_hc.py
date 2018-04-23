@@ -285,8 +285,8 @@ def main():
 
     toolbox = base.Toolbox()
 
-    # pool = Pool(multiprocessing.cpu_count())
-    # toolbox.register("map", pool.map)
+    pool = Pool(multiprocessing.cpu_count())
+    toolbox.register("map", pool.map)
 
     toolbox.register("attr_bool", lambda : random.choices([1, 0], weights=[0.01, 0.99], k=1)[0])
     toolbox.register(
