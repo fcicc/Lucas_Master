@@ -12,6 +12,7 @@ import shutil
 import sys
 import time
 import math
+import subprocess
 from functools import partial
 from multiprocessing.pool import Pool
 
@@ -248,12 +249,14 @@ def main():
     input_dir = os.path.dirname(args.input_file)
     clear_incomplete_experiments(input_dir)
 
+    code_version = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode("utf-8").replace('\n','')
     start_time = time.strftime("%Y_%m_%d-%H_%M_%S")
+    exec_label = ','.join([code_version, start_time])
     output_summary = open(
         os.path.join(
             input_dir,
             'dataset_analysis' +
-            start_time +
+            exec_label +
             '.txt'),
         'w')
 
@@ -410,7 +413,7 @@ def main():
         os.path.join(
             input_dir,
             'dataset_analysis' +
-            start_time +
+            exec_label +
             '_confusion_matrix.csv'))
 
     if args.evall_rate:
@@ -427,7 +430,7 @@ def main():
         correlation.to_csv(
             os.path.join(input_dir,
                         'dataset_analysis' +
-                        start_time +
+                        exec_label +
                         '_metrics.csv'),
             float_format='%.10f',
             index=True)
@@ -442,13 +445,13 @@ def main():
       ['petrofacie']].to_csv(
         os.path.join(input_dir,
                      'dataset_analysis' +
-                     start_time +
+                     exec_label +
                      '_filtered_dataset.csv'),
         quoting=csv.QUOTE_NONNUMERIC,
         float_format='%.10f',
         index=True)
 
-    logging.info("Results in " + str(start_time))
+    logging.info("Results in " + str(exec_label))
 
 if __name__ == '__main__':
     main()
