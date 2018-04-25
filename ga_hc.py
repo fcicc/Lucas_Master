@@ -188,22 +188,26 @@ def extract_subtotals(X):
 
     return df
 
-def checkBounds(min, max):
+
+def force_bounds(minimum, maximum, individual):
+    used_features = int(np.sum(individual))
+    if used_features > maximum:
+        extra_features =  used_features - maximum
+        used_features_idx = np.flatnonzero(individual==1).tolist()
+        turn_off_idx = random.sample(used_features_idx, extra_features)
+        individual[turn_off_idx] = 0
+    elif used_features < minimum:
+        missing_features = minimum - used_features
+        unused_features_idx = np.flatnonzero(individual==0).tolist()
+        turn_on_idx = random.sample(unused_features_idx, missing_features)
+        individual[turn_on_idx] = 1
+    return individual
+
+def checkBounds(minimum, maximum):
     def decorator(func):
         def wrapper(*args, **kargs):
             offspring = func(*args, **kargs)
-            for child in offspring:
-                used_features = int(np.sum(child))
-                if used_features > max:
-                    extra_features =  used_features - max
-                    used_features_idx = np.flatnonzero(child==1).tolist()
-                    turn_off_idx = random.sample(used_features_idx, extra_features)
-                    child[turn_off_idx] = 0
-                elif used_features < min:
-                    missing_features = min - used_features
-                    unused_features_idx = np.flatnonzero(child==0).tolist()
-                    turn_on_idx = random.sample(unused_features_idx, missing_features)
-                    child[turn_on_idx] = 1
+            offspring = map(partial(force_bounds, minimum, maximum), offspring)
 
             return offspring
         return wrapper
@@ -324,6 +328,7 @@ def main():
     toolbox.decorate("mutate", checkBounds(args.min_features, args.max_features))
 
     population = toolbox.population(n=args.pop_size)
+    population = toolbox.map(partial(force_bounds, args.min_features, args.max_features), population)
     fits = toolbox.map(toolbox.evaluate, population)
     for fit, ind in zip(fits, population):
         ind.fitness.values = fit
