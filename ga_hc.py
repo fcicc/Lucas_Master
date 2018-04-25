@@ -329,7 +329,7 @@ def main():
 
     if len(unique_labels(y)) > args.min_features:
         args.min_features = len(unique_labels(y))
-        output_summary.write('setting minimum number of features to ' + str(args.min_features + '\n\n'))
+        output_summary.write('setting minimum number of features to ' + str(args.min_features) + '\n\n')
     toolbox.decorate("mate", checkBounds(args.min_features, args.max_features))
     toolbox.decorate("mutate", checkBounds(args.min_features, args.max_features))
 
