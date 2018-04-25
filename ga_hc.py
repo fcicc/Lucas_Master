@@ -79,12 +79,11 @@ def evall_rate_metrics(X, y, ac, samples_dist_matrix, individual):
         'Davies_Bouldin','Dunn','Gamma','G_plus','GDI11','GDI12','GDI13','GDI21',
         'GDI22','GDI23','GDI31','GDI32','GDI33','GDI41','GDI42','GDI43','GDI51',
         'GDI52','GDI53','McClain_Rao','PBM','Point_Biserial','Ray_Turi',
-        'Ratkowsky_Lance','SD_Scat','SD_Dis','Silhouette','Tau','Wemmert_Gancarski',
-        'Xie_Beni']
+        'Ratkowsky_Lance','SD_Scat','SD_Dis','Silhouette','Tau','Wemmert_Gancarski']
 
     int_idx = r['unique_criteria'](X, pred, indexes)
     int_idx = [val[0] for val in list(int_idx)]
-
+    
     silhouette = silhouette_score(X, pred)
     adj_rand = adjusted_rand_score(y, pred)
     f1 = f1_score(y, y_pred, average='weighted')
@@ -148,7 +147,7 @@ def argument_parser():
         'GDI22','GDI23','GDI31','GDI32','GDI33','GDI41','GDI42','GDI43','GDI51',
         'GDI52','GDI53','McClain_Rao','PBM','Point_Biserial','Ray_Turi',
         'Ratkowsky_Lance','SD_Scat','SD_Dis','Silhouette','Tau','Wemmert_Gancarski',
-        'Xie_Beni','silhouette_sklearn']:
+        'silhouette_sklearn']:
         raise ValueError(args.fitness_metric + ' is not an acceptable fitness metric')
 
     return args
@@ -415,8 +414,7 @@ def main():
         'Davies_Bouldin','Dunn','Gamma','G_plus','GDI11','GDI12','GDI13','GDI21',
         'GDI22','GDI23','GDI31','GDI32','GDI33','GDI41','GDI42','GDI43','GDI51',
         'GDI52','GDI53','McClain_Rao','PBM','Point_Biserial','Ray_Turi',
-        'Ratkowsky_Lance','SD_Scat','SD_Dis','Silhouette','Tau','Wemmert_Gancarski',
-        'Xie_Beni']
+        'Ratkowsky_Lance','SD_Scat','SD_Dis','Silhouette','Tau','Wemmert_Gancarski']
         correlation.columns= criteria_names + [
             'accuracy', 'f1_score', 'adjusted_rand_score', 'silhouette_sklearn', 'complexity']
         correlation = correlation.reset_index(drop=True)
