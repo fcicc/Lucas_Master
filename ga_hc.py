@@ -231,14 +231,14 @@ def clear_incomplete_experiments(directory):
                 os.remove(run_file)
 
 
-def weighted_flipBit(variance_per_feature, individual):
+def weighted_flipBit(individual, negative_w):
     """FlipBit from deap with negative_w more chances of turning 1 to 0, than the reverse"""
     for i, _ in enumerate(individual):
         if individual[i]:
-            if random.random() > variance_per_feature[i]:
+            if random.random() < negative_w:
                 individual[i] = 0
         else:
-            if random.random() < variance_per_feature[i]:
+            if random.random() > negative_w:
                 individual[i] = 1                
     return individual,
 
@@ -283,9 +283,6 @@ def main():
     X = X.reset_index(drop=True)
     X_matrix = X.as_matrix()
 
-    variance_per_feature = X_matrix.var(axis=0)
-    variance_per_feature[np.nonzero(variance_per_feature > 0.95)] = 0.95
-
     logging.info(args)
 
     samples_dist_matrix = distance.squareform(distance.pdist(X_matrix))
@@ -324,7 +321,7 @@ def main():
     else:
         toolbox.register("evaluate", eval_features, X_matrix, ac, args.fitness_metric)
     toolbox.register("mate", tools.cxUniform, indpb=0.1)
-    toolbox.register("mutate", weighted_flipBit, variance_per_feature)
+    toolbox.register("mutate", weighted_flipBit, negative_w=0.9)
     toolbox.register("select", tools.selRoulette)
 
     if len(unique_labels(y)) > args.min_features:
