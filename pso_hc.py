@@ -138,14 +138,6 @@ def argument_parser():
                         help='number of individuals in the population')
     parser.add_argument('-c', '--use-categorical', action='store_true',
                         help='wether to use features attributes as categorical individual data')
-    parser.add_argument('-p', '--perfect', action='store_true',
-                        help='wether to use the perfect evaluation function')
-    parser.add_argument('-e', '--evall-rate', type=float, default=0,
-                        help='rate of best individuals to calculate all metrics')
-    parser.add_argument('--min-features', type=int, default=4,
-                        help='minimum number of features to be considered')
-    parser.add_argument('--max-features', type=int, default=50,
-                        help='maximum number of features to be considered')
     parser.add_argument('--fitness-metric', type=str, default='silhouette_sklearn',
                         help='fitness function to be used from the clusterCrit R package')
 
