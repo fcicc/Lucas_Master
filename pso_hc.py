@@ -78,30 +78,6 @@ def perfect_eval_features(X, y, ac, individual):
     return accuracy_score(y, y_pred), f1_score(y_num, pred, average='weighted')
 
 
-def evall_rate_metrics(X, y, ac, samples_dist_matrix, individual):
-    """Evaluate individual according multiple metrics and scores."""
-    pred = ac.fit(X*individual).labels_
-
-    y_pred = class_cluster_match(y, pred)
-
-    indexes = ['C_index','Calinski_Harabasz',
-        'Davies_Bouldin','Dunn','Gamma','G_plus','GDI11','GDI12','GDI13','GDI21',
-        'GDI22','GDI23','GDI31','GDI32','GDI33','GDI41','GDI42','GDI43','GDI51',
-        'GDI52','GDI53','McClain_Rao','PBM','Point_Biserial','Ray_Turi',
-        'Ratkowsky_Lance','SD_Scat','SD_Dis','Silhouette','Tau','Wemmert_Gancarski']
-
-    int_idx = r['unique_criteria'](X, pred, indexes)
-    int_idx = [val[0] for val in list(int_idx)]
-    
-    silhouette = silhouette_score(X, pred)
-    adj_rand = adjusted_rand_score(y, pred)
-    f1 = f1_score(y, y_pred, average='weighted')
-    acc = accuracy_score(y, y_pred)
-    complexity = int(np.sum(individual))
-
-    return tuple(int_idx) + (acc, f1, adj_rand, silhouette, complexity)
-
-
 def feature_relevance(X, y):
     """Calculate feature relevance according to the internal and external
        feature relevance."""
@@ -234,8 +210,6 @@ def main():
             '.txt'),
         'w')
 
-    population_rate = math.ceil(args.evall_rate * args.pop_size)
-
     output_summary.write(str(args) + '\n')
     
     own_script = open(sys.argv[0])
@@ -324,25 +298,6 @@ def main():
             'dataset_analysis' +
             exec_label +
             '_confusion_matrix.csv'))
-
-    if args.evall_rate:
-        correlation=pd.DataFrame.from_dict(correlation)
-        criteria_names = ['C_index','Calinski_Harabasz',
-        'Davies_Bouldin','Dunn','Gamma','G_plus','GDI11','GDI12','GDI13','GDI21',
-        'GDI22','GDI23','GDI31','GDI32','GDI33','GDI41','GDI42','GDI43','GDI51',
-        'GDI52','GDI53','McClain_Rao','PBM','Point_Biserial','Ray_Turi',
-        'Ratkowsky_Lance','SD_Scat','SD_Dis','Silhouette','Tau','Wemmert_Gancarski']
-        correlation.columns= criteria_names + [
-            'accuracy', 'f1_score', 'adjusted_rand_score', 'silhouette_sklearn', 'complexity']
-        correlation = correlation.reset_index(drop=True)
-
-        correlation.to_csv(
-            os.path.join(input_dir,
-                        'dataset_analysis' +
-                        exec_label +
-                        '_metrics.csv'),
-            float_format='%.10f',
-            index=True)
 
     output_summary.write(own_script_text)
 
