@@ -342,6 +342,7 @@ def main():
 
     NGEN = args.num_gen
     top = []
+    feature_selection_rate = []
     for gen in tqdm(range(NGEN)):
         offspring = algorithms.varOr(population, toolbox, args.pop_size, cxpb=0.2, mutpb=0.8)
         fits = toolbox.map(toolbox.evaluate, offspring)
@@ -353,6 +354,7 @@ def main():
             sample_fits = toolbox.map(partial(evall_rate_metrics, X_matrix, y, ac, samples_dist_matrix), sample_offspring)
             correlation += sample_fits
 
+
         old_top = top
         if top == []:
             top = tools.selBest(offspring + population, k=1)
@@ -360,6 +362,8 @@ def main():
             top = tools.selBest(offspring + top, k=1)
 
         population = toolbox.select(offspring+population, k=len(population))
+
+        feature_selection_rate.append(list(map(lambda x: x/len(population), np.sum(population, axis=0))))
 
     top = top[0]
 
@@ -438,6 +442,18 @@ def main():
     output_summary.write(own_script_text)
 
     output_summary.close()
+
+    feature_selection_rate = list(map(list, zip(*feature_selection_rate)))
+    df = {feature: sel_rate for feature, sel_rate in zip(X.columns.values, feature_selection_rate)}
+    df = pd.DataFrame.from_dict(df, orient='index')
+    df.to_csv(
+        os.path.join(input_dir,
+                     'dataset_analysis' +
+                     exec_label +
+                     '_selection_rate.csv'),
+        quoting=csv.QUOTE_NONNUMERIC,
+        float_format='%.10f',
+        index=True)
 
     X['petrofacie'] = y
     X.index = index
