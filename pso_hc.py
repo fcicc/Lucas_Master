@@ -269,7 +269,7 @@ def main():
     lb = [0]*X_matrix.shape[1]
     ub = [1]*X_matrix.shape[1]
     fitness_fnc = partial(eval_features, X_matrix, ac, args.fitness_metric)
-    top, ftop = pso(fitness_fnc, lb, ub, swarmsize=args.pop_size, maxiter=args.num_gen)
+    top, ftop = pso(fitness_fnc, lb, ub, swarmsize=args.pop_size, maxiter=args.num_gen, processes=multiprocessing.cpu_count())
 
     print(top)
 
