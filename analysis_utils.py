@@ -28,12 +28,13 @@ def argument_parser():
     parser.add_argument('-m', '--merge-results', action='store_true', help='')
     parser.add_argument('-n', '--n-last-results', type=int, help='', default=10)
     parser.add_argument('-t', '--petrel', action='store_true', help='')
+    parser.add_argument('-u', '--useful-features', action='store_true', help='')
 
     args = parser.parse_args()
 
     if sum([args.plot_correlation, args.correlation,
             args.feature_analysis, args.merge_results,
-            args.petrel]) != 1:
+            args.petrel, args.useful_features]) != 1:
         raise ValueError("Cannot have this combination of arguments.")
 
     return args
@@ -144,6 +145,15 @@ def petrofacies_to_petrel(df, args):
         file2.close()
 
 
+def find_useful_features(df, args):
+    description = df.groupby('petrofacie').var()
+    
+    if args.output_file:
+        description.to_csv(args.output_file,  quoting=csv.QUOTE_NONNUMERIC, float_format='%.10f', index=True)
+    else:
+        print(description)
+
+
 def main():
     args = argument_parser()
 
@@ -156,6 +166,9 @@ def main():
     elif args.feature_analysis:
         feature_selection_frequency(args)
         merge_results(args)
+    elif args.useful_features:
+        df = pd.read_csv(args.input_file, index_col=0)
+        find_useful_features(df, args)
     elif args.petrel:
         df = pd.read_csv(args.input_file, index_col=0)
         petrofacies_to_petrel(df, args)
