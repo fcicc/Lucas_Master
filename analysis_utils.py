@@ -116,31 +116,56 @@ def merge_results(args):
         print(all_results)
 
 
+def correct_wells_names(well_name):
+    if well_name == 'ENC-1A-RJS':
+        well_name = '1-ENC-0001A-RJS'
+    if well_name == 'MRK-5-RJS':
+        well_name = '1-MRK-0005-RJS'
+    if well_name == 'MRK-4P-RJS':
+        well_name = '1-MRK-0004P-RJS'
+    if well_name == 'RJS-100':
+        well_name = '1-RJS-0100-RJ'
+    if well_name == 'RJS-105':
+        well_name = '1-RJS-0105-RJ'
+    if well_name == 'ENC-2-RJS':
+        well_name = '3-ENC-0002-RJS'
+    if well_name == 'ENC-3-RJS':
+        well_name = '3-ENC-0003-RJS'
+    if well_name == 'PRG-1-RJS':
+        well_name = '3-PRG-0001-RJS'
+
+    return well_name
+
+
 def petrofacies_to_petrel(df, args):
     thin_section_names = df.index.values
     wells = map(partial(re.search, '([\w|-]+) [-+]?[0-9]*\.?[0-9]*'), thin_section_names)
     wells = list(map(lambda x: x.group(1), wells))
+    wells = list(map(correct_wells_names, wells))
     depths = map(partial(re.search, ' ([-+]?[0-9]*\.?[0-9]*)'), thin_section_names)
     depths = map(lambda x: x.group(1), depths)
     depths = list(map(float, depths))
     petrofacies = df['petrofacie'].values
 
-    epsilon = 0.009
+    epsilon = 0.01
     
     for well in set(wells):
         a1 = []
         a2 = []
         for depth, thin_section_name, petrofacie, well_i in zip(depths, thin_section_names, petrofacies, wells):
             if well_i != well: continue
-            a1.append([str(depth), str(depth+epsilon), '"'+thin_section_name+'"'])
-            a2.append([str(depth), str(depth+epsilon), '"'+petrofacie+'"'])
+            a1.append(['%.2f' % depth, '%.2f' % (depth+epsilon), '"'+('%.2f' % depth)+'"'])
+            a2.append(['%.2f' % depth, '%.2f' % (depth+epsilon), '"'+petrofacie+'"'])
         file1 = open(well+'_1.txt', 'w')
         file1.write('WELL: "'+ well +'"\n')
         file2 = open(well+'_2.txt', 'w')
         file2.write('WELL: "'+ well +'"\n')
-        for line1, line2 in zip(a1, a2):
+        for line1, line2 in zip(a1[:-1], a2[:-1]):
             file1.write('\t'.join(line1)+'\n')
             file2.write('\t'.join(line2)+'\n')
+        file1.write('\t'.join(a1[-1]))
+        file2.write('\t'.join(a2[-1]))
+
         file1.close()
         file2.close()
 
