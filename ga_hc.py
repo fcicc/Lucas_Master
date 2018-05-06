@@ -8,7 +8,6 @@ import multiprocessing
 import os
 import random
 import re
-import shutil
 import sys
 import time
 import math
@@ -24,21 +23,21 @@ from sklearn import cluster
 from sklearn.metrics import (accuracy_score, adjusted_rand_score,
                              calinski_harabaz_score, confusion_matrix,
                              f1_score, silhouette_score)
-from sklearn.metrics.cluster import class_cluster_match
-from sklearn.mixture import GaussianMixture
-from sklearn.model_selection import ParameterGrid
+from analysis_utils import class_cluster_match
 from sklearn.utils.multiclass import unique_labels
 from tqdm import tqdm
 
 import rpy2.robjects.numpy2ri
 from rpy2.robjects import r
 
+ALLOWED_FITNESSES = ['C_index', 'Calinski_Harabasz', 'Davies_Bouldin', 'Dunn', 'Gamma', 'G_plus', 'GDI11', 'GDI12',
+                     'GDI13', 'GDI21', 'GDI22', 'GDI23', 'GDI31', 'GDI32', 'GDI33', 'GDI41', 'GDI42', 'GDI43',
+                     'GDI51', 'GDI52', 'GDI53', 'McClain_Rao', 'PBM', 'Point_Biserial', 'Ray_Turi', 'Ratkowsky_Lance',
+                     'SD_Scat', 'SD_Dis', 'Silhouette', 'Tau', 'Wemmert_Gancarski', 'silhouette_sklearn']
+
 rpy2.robjects.numpy2ri.activate()
 
-
 logging.getLogger().setLevel(logging.INFO)
-
-
 
 r('''
     library('clusterCrit')
@@ -47,48 +46,44 @@ r('''
         intIdx
     }
     ''')
+
+
 def eval_features(X, ac, metric, individual):
     """Evaluate individual according to silhouette score."""
-    pred = ac.fit(X*individual).labels_
+    prediction = ac.fit(X * individual).labels_
     if metric != 'silhouette_sklearn':
-        index1 = r['unique_criteria'](X, pred, metric)
+        index1 = r['unique_criteria'](X, prediction, metric)
         index1 = np.asarray(index1)[0][0]
     else:
-        index1 = silhouette_score(X, pred)
+        index1 = silhouette_score(X, prediction)
 
-    return (index1,)
+    return index1,
 
 
 def perfect_eval_features(X, y, ac, individual):
     """Evaluate individual according to accuracy and f1-score."""
-    pred = ac.fit(X*individual).labels_
+    prediction = ac.fit(X * individual).labels_
 
-    y_pred = class_cluster_match(y, pred)
+    y_pred = class_cluster_match(y, prediction)
 
-    y_num = class_cluster_match(pred, y)
+    y_num = class_cluster_match(prediction, y)
 
-    return accuracy_score(y, y_pred), f1_score(y_num, pred, average='weighted')
+    return accuracy_score(y, y_pred), f1_score(y_num, prediction, average='weighted')
 
 
-def evall_rate_metrics(X, y, ac, samples_dist_matrix, individual):
+def evaluate_rate_metrics(X, y, ac, individual):
     """Evaluate individual according multiple metrics and scores."""
-    pred = ac.fit(X*individual).labels_
+    prediction = ac.fit(X * individual).labels_
 
-    y_pred = class_cluster_match(y, pred)
+    y_prediction = class_cluster_match(y, prediction)
 
-    indexes = ['C_index','Calinski_Harabasz',
-        'Davies_Bouldin','Dunn','Gamma','G_plus','GDI11','GDI12','GDI13','GDI21',
-        'GDI22','GDI23','GDI31','GDI32','GDI33','GDI41','GDI42','GDI43','GDI51',
-        'GDI52','GDI53','McClain_Rao','PBM','Point_Biserial','Ray_Turi',
-        'Ratkowsky_Lance','SD_Scat','SD_Dis','Silhouette','Tau','Wemmert_Gancarski']
-
-    int_idx = r['unique_criteria'](X, pred, indexes)
+    int_idx = r['unique_criteria'](X, prediction, ALLOWED_FITNESSES)
     int_idx = [val[0] for val in list(int_idx)]
-    
-    silhouette = silhouette_score(X, pred)
-    adj_rand = adjusted_rand_score(y, pred)
-    f1 = f1_score(y, y_pred, average='weighted')
-    acc = accuracy_score(y, y_pred)
+
+    silhouette = silhouette_score(X, prediction)
+    adj_rand = adjusted_rand_score(y, prediction)
+    f1 = f1_score(y, y_prediction, average='weighted')
+    acc = accuracy_score(y, y_prediction)
     complexity = int(np.sum(individual))
 
     return tuple(int_idx) + (acc, f1, adj_rand, silhouette, complexity)
@@ -101,21 +96,21 @@ def feature_relevance(X, y):
     features = X.columns.values
     C = 1
 
-    MRs = {feature: [] for feature in features}
+    mr_s = {feature: [] for feature in features}
     for cluster_i in clusters:
         cluster_instances = X.loc[[i == cluster_i for i in y]]
         not_cluster_instances = X.loc[[i != cluster_i for i in y]]
         for feature in features:
-            VI = np.std(cluster_instances[feature])
-            VE = np.std(not_cluster_instances[feature])
+            vi = np.std(cluster_instances[feature])
+            ve = np.std(not_cluster_instances[feature])
 
-            MR = VE / (VI + C)
-            MRs[feature].append(MR)
+            mr = ve / (vi + C)
+            mr_s[feature].append(mr)
 
-    MRs = pd.DataFrame.from_dict(MRs, orient='index')
-    MRs.columns = clusters
+    mr_s = pd.DataFrame.from_dict(mr_s, orient='index')
+    mr_s.columns = clusters
 
-    return MRs
+    return mr_s
 
 
 def argument_parser():
@@ -143,47 +138,42 @@ def argument_parser():
 
     args = parser.parse_args()
 
-    if args.fitness_metric not in ['C_index','Calinski_Harabasz',
-        'Davies_Bouldin','Dunn','Gamma','G_plus','GDI11','GDI12','GDI13','GDI21',
-        'GDI22','GDI23','GDI31','GDI32','GDI33','GDI41','GDI42','GDI43','GDI51',
-        'GDI52','GDI53','McClain_Rao','PBM','Point_Biserial','Ray_Turi',
-        'Ratkowsky_Lance','SD_Scat','SD_Dis','Silhouette','Tau','Wemmert_Gancarski',
-        'silhouette_sklearn']:
+    if args.fitness_metric not in ALLOWED_FITNESSES:
         raise ValueError(args.fitness_metric + ' is not an acceptable fitness metric')
 
     return args
 
 
-def extract_subtotals(X):
+def extract_subtotals(dataset):
     """Extract subtotals from compositional feature's attributes."""
-    compositional_features = [feature for feature in X.columns if ' - ' in feature]
+    compositional_features = [feature for feature in dataset.columns if ' - ' in feature]
 
     attributes = {}
     for feature in compositional_features:
         big_group = re.search('\[(.*)\]', feature).group(1)
-        feature_attrs = re.sub('\[(.*)\]', '', feature).split(' - ')
+        feature_attributes = re.sub('\[(.*)\]', '', feature).split(' - ')
 
         if big_group not in attributes:
-            attributes[big_group] = [{} for _ in feature_attrs]
+            attributes[big_group] = [{} for _ in feature_attributes]
 
-        for i, attribute in enumerate(feature_attrs):
+        for i, attribute in enumerate(feature_attributes):
             if attribute not in attributes[big_group][i]:
-                attributes[big_group][i][attribute] = [0 for _ in range(X.shape[0])]
+                attributes[big_group][i][attribute] = [0 for _ in range(dataset.shape[0])]
 
-    for i, row in enumerate(X.iterrows()):
+    for i, row in enumerate(dataset.iterrows()):
         for feature in compositional_features:
             if row[1][feature] > 0:
-                big_group = re.search('\[(.*)\]', feature).group(1)
-                feature_attrs = re.sub('\[(.*)\]', '', feature).split(' - ')
+                big_group = re.search("\[(.*)\]", feature).group(1)
+                feature_attributes = re.sub("\[(.*)\]", '', feature).split(' - ')
 
-                for j, attribute in enumerate(feature_attrs):
+                for j, attribute in enumerate(feature_attributes):
                     attributes[big_group][j][attribute][i] += row[1][feature]
 
     df = {}
     for big_group in attributes:
         for position, features in enumerate(attributes[big_group]):
             for attribute in features:
-                df['['+big_group+']'+str(position)+'-'+attribute] = features[attribute]
+                df['[' + big_group + ']' + str(position) + '-' + attribute] = features[attribute]
 
     df = pd.DataFrame.from_dict(df)
 
@@ -191,33 +181,51 @@ def extract_subtotals(X):
 
 
 def force_bounds(minimum, maximum, individual):
+    """Force complexity bound constraints.
+
+    :param int minimum: minimum allowed number of features
+    :param int maximum: maximum allowed number of features
+    :param individual: iterable individual
+    :return: iterable individual with the desired number of 1 alleles
+    """
     used_features = int(np.sum(individual))
     if used_features > maximum:
-        extra_features =  used_features - maximum
-        used_features_idx = np.flatnonzero(individual==1).tolist()
+        extra_features = used_features - maximum
+        used_features_idx = np.flatnonzero(individual == 1).tolist()
         turn_off_idx = random.sample(used_features_idx, extra_features)
         individual[turn_off_idx] = 0
     elif used_features < minimum:
         missing_features = minimum - used_features
-        unused_features_idx = np.flatnonzero(individual==0).tolist()
+        unused_features_idx = np.flatnonzero(individual == 0).tolist()
         turn_on_idx = random.sample(unused_features_idx, missing_features)
         individual[turn_on_idx] = 1
     return individual
 
-def checkBounds(minimum, maximum):
+
+def check_bounds(minimum, maximum):
+    """Enforce complexity bounds to offspring.
+
+    :param int minimum: minimum allowed number of features
+    :param int maximum: maximum allowed number of features
+    :return: wrapped function
+    """
     def decorator(func):
         def wrapper(*args, **kargs):
             offspring = func(*args, **kargs)
             offspring = map(partial(force_bounds, minimum, maximum), offspring)
 
             return offspring
+
         return wrapper
+
     return decorator
 
 
 def clear_incomplete_experiments(directory):
     """Search the input directory for incomplete run files and erase them."""
-    results_regex = os.path.join(directory,'dataset_analysis'+('[0-9]'*4)+'_'+('[0-9]'*2)+'_'+('[0-9]'*2)+'-'+('[0-9]'*2)+'_'+('[0-9]'*2)+'_'+('[0-9]'*2)+'.txt')
+    results_regex = os.path.join(directory,
+                                 "dataset_analysis{0}_{1}_{2}-{3}_{4}_{5}.txt".format(('[0-9]' * 4), ('[0-9]' * 2), (
+                                         '[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2)))
     summary_files = glob.glob(results_regex)
 
     for summary_file in summary_files:
@@ -225,13 +233,13 @@ def clear_incomplete_experiments(directory):
         content = file.read()
         file.close()
         if 'adjusted rand' not in content.lower():
-            run_id = re.search('dataset_analysis(.*).txt', summary_file).group(1)
-            run_files_regex = os.path.join(directory, 'dataset_analysis'+run_id+'*')
+            run_id = re.search("dataset_analysis(.*).txt", summary_file).group(1)
+            run_files_regex = os.path.join(directory, 'dataset_analysis' + run_id + '*')
             for run_file in glob.glob(run_files_regex):
                 os.remove(run_file)
 
 
-def weighted_flipBit(individual, negative_w):
+def weighted_flip_bit(individual, negative_w):
     """FlipBit from deap with negative_w more chances of turning 1 to 0, than the reverse"""
     for i, _ in enumerate(individual):
         if individual[i]:
@@ -239,8 +247,9 @@ def weighted_flipBit(individual, negative_w):
                 individual[i] = 0
         else:
             if random.random() > negative_w:
-                individual[i] = 1                
+                individual[i] = 1
     return individual,
+
 
 def main():
     """Main function."""
@@ -249,21 +258,15 @@ def main():
     input_dir = os.path.dirname(args.input_file)
     clear_incomplete_experiments(input_dir)
 
-    code_version = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode("utf-8").replace('\n','')
+    code_version = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode("utf-8").replace('\n', '')
     start_time = time.strftime("%Y_%m_%d-%H_%M_%S")
     exec_label = ','.join([code_version, start_time])
-    output_summary = open(
-        os.path.join(
-            input_dir,
-            'dataset_analysis' +
-            exec_label +
-            '.txt'),
-        'w')
+    output_summary = open(os.path.join(input_dir, 'dataset_analysis{0}.txt'.format(exec_label)), 'w')
 
     population_rate = math.ceil(args.evall_rate * args.pop_size)
 
     output_summary.write(str(args) + '\n')
-    
+
     own_script = open(sys.argv[0])
     own_script_text = own_script.read()
     own_script.close()
@@ -272,63 +275,61 @@ def main():
 
     y = df['petrofacie'].as_matrix()
     del df['petrofacie']
-    X = df
+    dataset = df
 
     if args.use_categorical:
-        index = X.index
-        X = X.reset_index(drop=True)
-        X = pd.concat([X, extract_subtotals(X)], axis=1)
-        X.index = index
-    index = X.index
-    X = X.reset_index(drop=True)
-    X_matrix = X.as_matrix()
+        index = dataset.index
+        dataset = dataset.reset_index(drop=True)
+        dataset = pd.concat([dataset, extract_subtotals(dataset)], axis=1)
+        dataset.index = index
+    index = dataset.index
+    dataset = dataset.reset_index(drop=True)
+    dataset_matrix = dataset.as_matrix()
 
     logging.info(args)
 
-    samples_dist_matrix = distance.squareform(distance.pdist(X_matrix))
+    samples_dist_matrix = distance.squareform(distance.pdist(dataset_matrix))
 
     ac = cluster.AgglomerativeClustering(n_clusters=len(unique_labels(y)),
                                          affinity='manhattan',
                                          linkage='complete')
 
-    if args.fitness_metric in ['Calinski_Harabasz','Dunn','Gamma','G_plus',
-        'GDI11','GDI12','GDI13','GDI21','GDI22','GDI23','GDI31','GDI32',
-        'GDI33','GDI41','GDI42','GDI43','GDI51','GDI52','GDI53','PBM',
-        'Point_Biserial','Ratkowsky_Lance','Silhouette','Tau',
-        'Wemmert_Gancarski', 'silhouette_sklearn']:
-        creator.create("FitnessMax", base.Fitness, weights=(1, ))
+    if args.fitness_metric in ['Calinski_Harabasz', 'Dunn', 'Gamma', 'G_plus',
+                               'GDI11', 'GDI12', 'GDI13', 'GDI21', 'GDI22', 'GDI23', 'GDI31', 'GDI32',
+                               'GDI33', 'GDI41', 'GDI42', 'GDI43', 'GDI51', 'GDI52', 'GDI53', 'PBM',
+                               'Point_Biserial', 'Ratkowsky_Lance', 'Silhouette', 'Tau',
+                               'Wemmert_Gancarski', 'silhouette_sklearn']:
+        creator.create("FitnessMax", base.Fitness, weights=(1,))
     else:
-        creator.create("FitnessMax", base.Fitness, weights=(-1, ))
+        creator.create("FitnessMax", base.Fitness, weights=(-1,))
 
     creator.create("Individual", np.ndarray, fitness=creator.FitnessMax)
 
     toolbox = base.Toolbox()
 
     pool = Pool(multiprocessing.cpu_count())
-    toolbox.register("map", pool.map)
 
-    toolbox.register("attr_bool", lambda : random.choices([1, 0], weights=[0.01, 0.99], k=1)[0])
+    toolbox.register("map", pool.map)
+    toolbox.register("attr_bool", lambda: random.choices([1, 0], weights=[0.01, 0.99], k=1)[0])
     toolbox.register(
         "individual",
         tools.initRepeat,
         creator.Individual,
         toolbox.attr_bool,
-        n=X_matrix.shape[1])
+        n=dataset_matrix.shape[1])
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-
     if args.perfect:
-        toolbox.register("evaluate", perfect_eval_features, X_matrix, y, ac)
+        toolbox.register("evaluate", perfect_eval_features, dataset_matrix, y, ac)
     else:
-        toolbox.register("evaluate", eval_features, X_matrix, ac, args.fitness_metric)
+        toolbox.register("evaluate", eval_features, dataset_matrix, ac, args.fitness_metric)
     toolbox.register("mate", tools.cxUniform, indpb=0.1)
-    toolbox.register("mutate", weighted_flipBit, negative_w=0.9)
+    toolbox.register("mutate", weighted_flip_bit, negative_w=0.9)
     toolbox.register("select", tools.selRoulette)
-
     if len(unique_labels(y)) > args.min_features:
         args.min_features = len(unique_labels(y))
         output_summary.write('setting minimum number of features to ' + str(args.min_features) + '\n\n')
-    toolbox.decorate("mate", checkBounds(args.min_features, args.max_features))
-    toolbox.decorate("mutate", checkBounds(args.min_features, args.max_features))
+    toolbox.decorate("mate", check_bounds(args.min_features, args.max_features))
+    toolbox.decorate("mutate", check_bounds(args.min_features, args.max_features))
 
     population = toolbox.population(n=args.pop_size)
     population = toolbox.map(partial(force_bounds, args.min_features, args.max_features), population)
@@ -338,7 +339,8 @@ def main():
 
     if args.evall_rate:
         sample_population = random.sample(population, population_rate)
-        correlation = list(toolbox.map(partial(evall_rate_metrics, X_matrix, y, ac, samples_dist_matrix), sample_population))
+        correlation = list(
+            toolbox.map(partial(evaluate_rate_metrics, dataset_matrix, y, ac, samples_dist_matrix), sample_population))
 
     NGEN = args.num_gen
     top = []
@@ -351,9 +353,9 @@ def main():
 
         if args.evall_rate:
             sample_offspring = random.sample(offspring, population_rate)
-            sample_fits = toolbox.map(partial(evall_rate_metrics, X_matrix, y, ac, samples_dist_matrix), sample_offspring)
+            sample_fits = toolbox.map(partial(evaluate_rate_metrics, dataset_matrix, y, ac, samples_dist_matrix),
+                                      sample_offspring)
             correlation += sample_fits
-
 
         old_top = top
         if top == []:
@@ -361,46 +363,46 @@ def main():
         else:
             top = tools.selBest(offspring + top, k=1)
 
-        population = toolbox.select(offspring+population, k=len(population))
+        population = toolbox.select(offspring + population, k=len(population))
 
-        feature_selection_rate.append(list(map(lambda x: x/len(population), np.sum(population, axis=0))))
+        feature_selection_rate.append(list(map(lambda x: x / len(population), np.sum(population, axis=0))))
 
     top = top[0]
 
-    best_features = [col for col, boolean in zip(X.columns.values, top)
+    best_features = [col for col, boolean in zip(dataset.columns.values, top)
                      if boolean]
-    best_pred = ac.fit(X[best_features]).labels_
+    best_pred = ac.fit(dataset[best_features]).labels_
 
-    std_variances = X.std(axis=0)
+    std_variances = dataset.std(axis=0)
 
     result = {
         feature: std_variance for feature,
-        std_variance in zip(
+            std_variance in zip(
             best_features,
             std_variances)}
     result = pd.DataFrame.from_dict(result, orient='index')
     result.columns = ['std']
-    MRs = feature_relevance(X, y)
+    MRs = feature_relevance(dataset, y)
     result = pd.concat([result, MRs], axis=1, join='inner')
     result = result.sort_values('std', ascending=False)
-    initial_n_features = X_matrix.shape[1]
+    initial_n_features = dataset_matrix.shape[1]
     final_n_features = len(best_features)
-    feature_reduction_rate = final_n_features/initial_n_features
+    feature_reduction_rate = final_n_features / initial_n_features
 
-    y_pred = class_cluster_match(y, best_pred)
-    cm = confusion_matrix(y, y_pred)
+    y_prediction = class_cluster_match(y, best_pred)
+    cm = confusion_matrix(y, y_prediction)
     cm = pd.DataFrame(data=cm, index=unique_labels(y),
                       columns=unique_labels(best_pred))
 
     output_summary.write("SUMMARY:\n")
     result_summary = {'initial number of features': [initial_n_features],
-                      'feature reduction rate' : [feature_reduction_rate],
-                      'final number of features' : [final_n_features],
-                      'adjusted Rand score' : [adjusted_rand_score(y, best_pred)],
-                      'silhouette score' : [silhouette_score(X[best_features], best_pred)],
-                      'calinski harabaz score' : [calinski_harabaz_score(X[best_features], best_pred)],
-                      'accuracy score' : [accuracy_score(y, y_pred)],
-                      'f1 score' : [f1_score(y, y_pred, average='weighted')]}
+                      'feature reduction rate': [feature_reduction_rate],
+                      'final number of features': [final_n_features],
+                      'adjusted Rand score': [adjusted_rand_score(y, best_pred)],
+                      'silhouette score': [silhouette_score(dataset[best_features], best_pred)],
+                      'calinski harabaz score': [calinski_harabaz_score(dataset[best_features], best_pred)],
+                      'accuracy score': [accuracy_score(y, y_prediction)],
+                      'f1 score': [f1_score(y, y_prediction, average='weighted')]}
 
     result_summary = pd.DataFrame.from_dict(result_summary).transpose()
     with pd.option_context('display.max_rows', None, 'display.max_columns',
@@ -416,26 +418,22 @@ def main():
     cm.to_csv(
         os.path.join(
             input_dir,
-            'dataset_analysis' +
-            exec_label +
-            '_confusion_matrix.csv'))
+            'dataset_analysis{0}_confusion_matrix.csv'.format(exec_label)))
 
     if args.evall_rate:
-        correlation=pd.DataFrame.from_dict(correlation)
-        criteria_names = ['C_index','Calinski_Harabasz',
-        'Davies_Bouldin','Dunn','Gamma','G_plus','GDI11','GDI12','GDI13','GDI21',
-        'GDI22','GDI23','GDI31','GDI32','GDI33','GDI41','GDI42','GDI43','GDI51',
-        'GDI52','GDI53','McClain_Rao','PBM','Point_Biserial','Ray_Turi',
-        'Ratkowsky_Lance','SD_Scat','SD_Dis','Silhouette','Tau','Wemmert_Gancarski']
-        correlation.columns= criteria_names + [
+        correlation = pd.DataFrame.from_dict(correlation)
+        criteria_names = ['C_index', 'Calinski_Harabasz',
+                          'Davies_Bouldin', 'Dunn', 'Gamma', 'G_plus', 'GDI11', 'GDI12', 'GDI13', 'GDI21',
+                          'GDI22', 'GDI23', 'GDI31', 'GDI32', 'GDI33', 'GDI41', 'GDI42', 'GDI43', 'GDI51',
+                          'GDI52', 'GDI53', 'McClain_Rao', 'PBM', 'Point_Biserial', 'Ray_Turi',
+                          'Ratkowsky_Lance', 'SD_Scat', 'SD_Dis', 'Silhouette', 'Tau', 'Wemmert_Gancarski']
+        correlation.columns = criteria_names + [
             'accuracy', 'f1_score', 'adjusted_rand_score', 'silhouette_sklearn', 'complexity']
         correlation = correlation.reset_index(drop=True)
 
         correlation.to_csv(
             os.path.join(input_dir,
-                        'dataset_analysis' +
-                        exec_label +
-                        '_metrics.csv'),
+                         'dataset_analysis{0}_metrics.csv'.format(exec_label)),
             float_format='%.10f',
             index=True)
 
@@ -444,30 +442,27 @@ def main():
     output_summary.close()
 
     feature_selection_rate = list(map(list, zip(*feature_selection_rate)))
-    df = {feature: sel_rate for feature, sel_rate in zip(X.columns.values, feature_selection_rate)}
+    df = {feature: sel_rate for feature, sel_rate in zip(dataset.columns.values, feature_selection_rate)}
     df = pd.DataFrame.from_dict(df, orient='index')
     df.to_csv(
         os.path.join(input_dir,
-                     'dataset_analysis' +
-                     exec_label +
-                     '_selection_rate.csv'),
+                     'dataset_analysis{0}_selection_rate.csv'.format(exec_label)),
         quoting=csv.QUOTE_NONNUMERIC,
         float_format='%.10f',
         index=True)
 
-    X['petrofacie'] = y
-    X.index = index
-    X[best_features +
-      ['petrofacie']].to_csv(
+    dataset['petrofacie'] = y
+    dataset.index = index
+    dataset[best_features +
+            ['petrofacie']].to_csv(
         os.path.join(input_dir,
-                     'dataset_analysis' +
-                     exec_label +
-                     '_filtered_dataset.csv'),
+                     'dataset_analysis{0}_filtered_dataset.csv'.format(exec_label)),
         quoting=csv.QUOTE_NONNUMERIC,
         float_format='%.10f',
         index=True)
 
     logging.info("Results in " + str(exec_label))
+
 
 if __name__ == '__main__':
     main()
