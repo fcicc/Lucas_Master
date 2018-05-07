@@ -57,6 +57,9 @@ def eval_features(X, ac, metric, individual):
     else:
         index1 = silhouette_score(X, prediction)
 
+    if 'silhouette' in metric:
+        index1 += 1
+
     return index1,
 
 
@@ -310,7 +313,7 @@ def main():
     pool = Pool(multiprocessing.cpu_count())
 
     toolbox.register("map", pool.map)
-    toolbox.register("attr_bool", lambda: random.choices([1, 0], weights=[0.01, 0.99], k=1)[0])
+    toolbox.register("attr_bool", random.randint, 0, 1)
     toolbox.register(
         "individual",
         tools.initRepeat,
@@ -323,8 +326,8 @@ def main():
     else:
         toolbox.register("evaluate", eval_features, dataset_matrix, ac, args.fitness_metric)
     toolbox.register("mate", tools.cxUniform, indpb=0.1)
-    toolbox.register("mutate", weighted_flip_bit, negative_w=0.9)
-    toolbox.register("select", tools.selRoulette)
+    toolbox.register("mutate", tools.mutFlipBit, indpb=0.05)
+    toolbox.register("select", tools.selTournament, tournsize=3)
     if len(unique_labels(y)) > args.min_features:
         args.min_features = len(unique_labels(y))
         output_summary.write('setting minimum number of features to ' + str(args.min_features) + '\n\n')
@@ -333,9 +336,7 @@ def main():
 
     population = toolbox.population(n=args.pop_size)
     population = toolbox.map(partial(force_bounds, args.min_features, args.max_features), population)
-    fits = toolbox.map(toolbox.evaluate, population)
-    for fit, ind in zip(fits, population):
-        ind.fitness.values = fit
+    evaluate(toolbox, population)
 
     if args.evall_rate:
         sample_population = random.sample(population, population_rate)
@@ -347,9 +348,7 @@ def main():
     feature_selection_rate = []
     for gen in tqdm(range(NGEN)):
         offspring = algorithms.varOr(population, toolbox, args.pop_size, cxpb=0.2, mutpb=0.8)
-        fits = toolbox.map(toolbox.evaluate, offspring)
-        for fit, ind in zip(fits, offspring):
-            ind.fitness.values = fit
+        evaluate(toolbox, offspring)
 
         if args.evall_rate:
             sample_offspring = random.sample(offspring, population_rate)
@@ -462,6 +461,11 @@ def main():
         index=True)
 
     logging.info("Results in " + str(exec_label))
+
+def evaluate(toolbox, offspring):
+    fits = toolbox.map(toolbox.evaluate, offspring)
+    for fit, ind in zip(fits, offspring):
+        ind.fitness.values = fit
 
 
 if __name__ == '__main__':
