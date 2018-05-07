@@ -313,7 +313,7 @@ def main():
 
     pool = Pool(multiprocessing.cpu_count())
 
-    # tool  box.register("map", pool.map)
+    toolbox.register("map", pool.map)
     toolbox.register("attr_bool", random.randint, 0, 1)
     toolbox.register(
         "individual",
