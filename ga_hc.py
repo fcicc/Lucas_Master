@@ -30,10 +30,11 @@ from tqdm import tqdm
 import rpy2.robjects.numpy2ri
 from rpy2.robjects import r
 
-ALLOWED_FITNESSES = ['C_index', 'Calinski_Harabasz', 'Davies_Bouldin', 'Dunn', 'Gamma', 'G_plus', 'GDI11', 'GDI12',
+R_ALLOWED_FITNESSES = ['C_index', 'Calinski_Harabasz', 'Davies_Bouldin', 'Dunn', 'Gamma', 'G_plus', 'GDI11', 'GDI12',
                      'GDI13', 'GDI21', 'GDI22', 'GDI23', 'GDI31', 'GDI32', 'GDI33', 'GDI41', 'GDI42', 'GDI43',
                      'GDI51', 'GDI52', 'GDI53', 'McClain_Rao', 'PBM', 'Point_Biserial', 'Ray_Turi', 'Ratkowsky_Lance',
-                     'SD_Scat', 'SD_Dis', 'Silhouette', 'Tau', 'Wemmert_Gancarski', 'silhouette_sklearn']
+                     'SD_Scat', 'SD_Dis', 'Silhouette', 'Tau', 'Wemmert_Gancarski']
+ALLOWED_FITNESSES = R_ALLOWED_FITNESSES + ['silhouette_sklearn']
 
 rpy2.robjects.numpy2ri.activate()
 
@@ -80,7 +81,7 @@ def evaluate_rate_metrics(X, y, ac, individual):
 
     y_prediction = class_cluster_match(y, prediction)
 
-    int_idx = r['unique_criteria'](X, prediction, ALLOWED_FITNESSES)
+    int_idx = r['unique_criteria'](X, prediction, R_ALLOWED_FITNESSES)
     int_idx = [val[0] for val in list(int_idx)]
 
     silhouette = silhouette_score(X, prediction)
@@ -312,7 +313,7 @@ def main():
 
     pool = Pool(multiprocessing.cpu_count())
 
-    toolbox.register("map", pool.map)
+    # tool  box.register("map", pool.map)
     toolbox.register("attr_bool", random.randint, 0, 1)
     toolbox.register(
         "individual",
@@ -335,13 +336,13 @@ def main():
     toolbox.decorate("mutate", check_bounds(args.min_features, args.max_features))
 
     population = toolbox.population(n=args.pop_size)
-    population = toolbox.map(partial(force_bounds, args.min_features, args.max_features), population)
+    population = list(toolbox.map(partial(force_bounds, args.min_features, args.max_features), population))
     evaluate(toolbox, population)
 
     if args.evall_rate:
         sample_population = random.sample(population, population_rate)
         correlation = list(
-            toolbox.map(partial(evaluate_rate_metrics, dataset_matrix, y, ac, samples_dist_matrix), sample_population))
+            toolbox.map(partial(evaluate_rate_metrics, dataset_matrix, y, ac), sample_population))
 
     NGEN = args.num_gen
     top = []
@@ -352,7 +353,7 @@ def main():
 
         if args.evall_rate:
             sample_offspring = random.sample(offspring, population_rate)
-            sample_fits = toolbox.map(partial(evaluate_rate_metrics, dataset_matrix, y, ac, samples_dist_matrix),
+            sample_fits = toolbox.map(partial(evaluate_rate_metrics, dataset_matrix, y, ac),
                                       sample_offspring)
             correlation += sample_fits
 
