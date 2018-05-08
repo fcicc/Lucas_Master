@@ -50,7 +50,7 @@ def plot_correlation(df, args):
                          df[args.axis2],
                          c=df.index.values,
                          s=3, cmap='viridis', alpha=0.7)
-    plt.colorbar(points, label='f1_score')
+    plt.colorbar(points, label='index')
     sns.regplot(args.axis1, args.axis2, data=df, scatter=False, x_jitter=0.05, y_jitter=0.05, order=1, robust=False)
 
     if args.output_file:
