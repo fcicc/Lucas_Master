@@ -229,24 +229,6 @@ def check_bounds(minimum, maximum):
     return decorator
 
 
-def clear_incomplete_experiments(directory):
-    """Search the input directory for incomplete run files and erase them."""
-    results_regex = os.path.join(directory,
-                                 "dataset_analysis{0}_{1}_{2}-{3}_{4}_{5}.txt".format(('[0-9]' * 4), ('[0-9]' * 2), (
-                                         '[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2)))
-    summary_files = glob.glob(results_regex)
-
-    for summary_file in summary_files:
-        file = open(summary_file)
-        content = file.read()
-        file.close()
-        if 'adjusted rand' not in content.lower():
-            run_id = re.search("dataset_analysis(.*).txt", summary_file).group(1)
-            run_files_regex = os.path.join(directory, 'dataset_analysis' + run_id + '*')
-            for run_file in glob.glob(run_files_regex):
-                os.remove(run_file)
-
-
 def weighted_flip_bit(individual, negative_w):
     """FlipBit from deap with negative_w more chances of turning 1 to 0, than the reverse"""
     for i, _ in enumerate(individual):
@@ -264,7 +246,6 @@ def main():
     args = argument_parser()
 
     input_dir = os.path.dirname(args.input_file)
-    clear_incomplete_experiments(input_dir)
 
     code_version = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode("utf-8").replace('\n', '')
     start_time = time.strftime("%Y_%m_%d-%H_%M_%S")
@@ -310,7 +291,7 @@ def main():
 
     toolbox = base.Toolbox()
 
-    pool = Pool(multiprocessing.cpu_count())
+    pool = Pool(multiprocessing.cpu_count()-1)
 
     toolbox.register("map", pool.map)
     toolbox.register("attr_bool", random.randint, 0, 1)

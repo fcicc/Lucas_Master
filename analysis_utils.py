@@ -26,6 +26,7 @@ def argument_parser():
     parser.add_argument('-p', '--plot-correlation', action='store_true', help='plot correlation')
     parser.add_argument('--axis1', type=str, help='''first plot axis''')
     parser.add_argument('--axis2', type=str, help='''second plot axis''')
+    parser.add_argument('--color', type=str, help='''point color''', default='index')
     parser.add_argument('-c', '--correlation', action='store_true', help='generates correlation matrix')
     parser.add_argument('-f', '--feature-analysis', action='store_true', help='')
     parser.add_argument('-m', '--merge-results', action='store_true', help='')
@@ -33,12 +34,14 @@ def argument_parser():
     parser.add_argument('-n', '--n-last-results', type=int, help='', default=10)
     parser.add_argument('-t', '--petrel', action='store_true', help='')
     parser.add_argument('-u', '--useful-features', action='store_true', help='')
+    parser.add_argument('-b', '--clear-incomplete-outputs', action='store_true', help='')
 
     args = parser.parse_args()
 
     if sum([args.plot_correlation, args.correlation,
             args.feature_analysis, args.merge_results,
-            args.petrel, args.useful_features, args.merge_feature_selection]) != 1:
+            args.petrel, args.useful_features, args.merge_feature_selection,
+            args.clear_incomplete_outputs]) != 1:
         raise ValueError("Cannot have this combination of arguments.")
 
     return args
@@ -46,11 +49,19 @@ def argument_parser():
 
 def plot_correlation(df, args):
     plt.figure()
-    points = plt.scatter(df[args.axis1],
-                         df[args.axis2],
-                         c=df.index.values,
-                         s=3, cmap='viridis', alpha=0.7)
-    plt.colorbar(points, label='index')
+    if args.color == 'index':
+        points = plt.scatter(df[args.axis1],
+                            df[args.axis2],
+                            c=df.index.values,
+                            s=3, cmap='viridis', alpha=0.7)
+        plt.colorbar(points, label='index')
+    else:
+        points = plt.scatter(df[args.axis1],
+                            df[args.axis2],
+                            c=df[args.color],
+                            s=3, cmap='viridis', alpha=0.7)
+        plt.colorbar(points, label=args.color)
+        
     sns.regplot(args.axis1, args.axis2, data=df, scatter=False, x_jitter=0.05, y_jitter=0.05, order=1, robust=False)
 
     if args.output_file:
@@ -186,6 +197,27 @@ def merge_feature_selection(args):
         results_df.to_csv(args.output_file, quoting=csv.QUOTE_NONNUMERIC, float_format='%.10f', index=True)
     else:
         print(results_df)
+        
+
+def clear_incomplete_experiments(args):
+    """Search the input directory for incomplete run files and erase them."""
+    results_regex = os.path.join(args.input_file,
+                    "dataset_analysis{0},{1}_{2}_{3}-{4}_{5}_{6}.txt".format(('[0-9a-fA-F]' * 7),('[0-9]' * 4), (
+                                        '[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2)))
+    summary_files = glob.glob(results_regex)
+
+    for summary_file in summary_files:
+        summary_file_name = os.path.basename(summary_file)
+        file_id = re.search("dataset_analysis({0},{1}_{2}_{3}-{4}_{5}_{6}).txt".format(('[0-9a-fA-F]' * 7),('[0-9]' * 4), (
+                                        '[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2)),
+                                        summary_file_name).group(1)
+        related_files = glob.glob(args.input_file + '/*{0}*'.format(file_id))
+        if len(related_files) < 4:
+            print('Erasing files from execution {0}'.format(file_id))
+            for file_path in related_files:
+                os.remove(file_path)
+
+    print('Done!')
 
 
 def main():
@@ -207,6 +239,8 @@ def main():
         petrofacies_to_petrel(df, args)
     elif args.merge_feature_selection:
         merge_feature_selection(args)
+    elif args.clear_incomplete_outputs:
+        clear_incomplete_experiments(args)
 
 
 def class_cluster_match(y_true, y_pred):
