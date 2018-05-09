@@ -30,11 +30,15 @@ from tqdm import tqdm
 import rpy2.robjects.numpy2ri
 from rpy2.robjects import r
 
-R_ALLOWED_FITNESSES = ['C_index', 'Calinski_Harabasz', 'Davies_Bouldin', 'Dunn', 'Gamma', 'G_plus', 'GDI11', 'GDI12',
-                     'GDI13', 'GDI21', 'GDI22', 'GDI23', 'GDI31', 'GDI32', 'GDI33', 'GDI41', 'GDI42', 'GDI43',
-                     'GDI51', 'GDI52', 'GDI53', 'McClain_Rao', 'PBM', 'Point_Biserial', 'Ray_Turi', 'Ratkowsky_Lance',
-                     'SD_Scat', 'SD_Dis', 'Silhouette', 'Tau', 'Wemmert_Gancarski']
-ALLOWED_FITNESSES = R_ALLOWED_FITNESSES + ['silhouette_sklearn']
+R_ALLOWED_FITNESSES = [('C_index', -1), ('Calinski_Harabasz', 1), ('Davies_Bouldin', -1),
+                       ('Dunn', 1), ('Gamma', 1), ('G_plus', 1), ('GDI11', 1), ('GDI12', 1),
+                       ('GDI13', 1), ('GDI21', 1), ('GDI22', 1), ('GDI23', 1), ('GDI31', 1),
+                       ('GDI32', 1), ('GDI33', 1), ('GDI41', 1), ('GDI42', 1), ('GDI43', 1),
+                       ('GDI51', 1), ('GDI52', 1), ('GDI53', 1), ('McClain_Rao', -1), ('PBM', 1),
+                       ('Point_Biserial', 1), ('Ray_Turi', -1), ('Ratkowsky_Lance', 1),
+                       ('SD_Scat', -1), ('SD_Dis', -1), ('Silhouette', 1), ('Tau', 1),
+                       ('Wemmert_Gancarski', 1)]
+ALLOWED_FITNESSES = R_ALLOWED_FITNESSES + [('silhouette_sklearn', 1)]
 
 rpy2.robjects.numpy2ri.activate()
 
@@ -81,7 +85,7 @@ def evaluate_rate_metrics(X, y, ac, individual):
 
     y_prediction = class_cluster_match(y, prediction)
 
-    int_idx = r['unique_criteria'](X, prediction, R_ALLOWED_FITNESSES)
+    int_idx = r['unique_criteria'](X, prediction, [fit[0] for fit in R_ALLOWED_FITNESSES])
     int_idx = [val[0] for val in list(int_idx)]
 
     silhouette = silhouette_score(X, prediction)
@@ -142,7 +146,7 @@ def argument_parser():
 
     args = parser.parse_args()
 
-    if args.fitness_metric not in ALLOWED_FITNESSES:
+    if args.fitness_metric not in [fit[0] for fit in ALLOWED_FITNESSES]:
         raise ValueError(args.fitness_metric + ' is not an acceptable fitness metric')
 
     return args
@@ -298,14 +302,9 @@ def main():
                                          affinity='manhattan',
                                          linkage='complete')
 
-    if args.fitness_metric in ['Calinski_Harabasz', 'Dunn', 'Gamma', 'G_plus',
-                               'GDI11', 'GDI12', 'GDI13', 'GDI21', 'GDI22', 'GDI23', 'GDI31', 'GDI32',
-                               'GDI33', 'GDI41', 'GDI42', 'GDI43', 'GDI51', 'GDI52', 'GDI53', 'PBM',
-                               'Point_Biserial', 'Ratkowsky_Lance', 'Silhouette', 'Tau',
-                               'Wemmert_Gancarski', 'silhouette_sklearn']:
-        creator.create("FitnessMax", base.Fitness, weights=(1,))
-    else:
-        creator.create("FitnessMax", base.Fitness, weights=(-1,))
+    weight = [fit[1] for fit in ALLOWED_FITNESSES if fit[0] == args.fitness_metric][0]
+    creator.create("FitnessMax", base.Fitness,
+                   weights=(weight,))
 
     creator.create("Individual", np.ndarray, fitness=creator.FitnessMax)
 
