@@ -22,7 +22,7 @@ from scipy.spatial import distance
 from sklearn import cluster
 from sklearn.metrics import (accuracy_score, adjusted_rand_score,
                              calinski_harabaz_score, confusion_matrix,
-                             f1_score, silhouette_score)
+                             f1_score, silhouette_score, silhouette_samples)
 from analysis_utils import class_cluster_match
 from sklearn.utils.multiclass import unique_labels
 from tqdm import tqdm
@@ -38,7 +38,7 @@ R_ALLOWED_FITNESSES = [('C_index', -1), ('Calinski_Harabasz', 1), ('Davies_Bould
                        ('Point_Biserial', 1), ('Ray_Turi', -1), ('Ratkowsky_Lance', 1),
                        ('SD_Scat', -1), ('SD_Dis', -1), ('Silhouette', 1), ('Tau', 1),
                        ('Wemmert_Gancarski', 1)]
-ALLOWED_FITNESSES = R_ALLOWED_FITNESSES + [('silhouette_sklearn', 1)]
+ALLOWED_FITNESSES = R_ALLOWED_FITNESSES + [('silhouette_sklearn', 1), ('min_silhouette_sklearn', 1)]
 
 rpy2.robjects.numpy2ri.activate()
 
@@ -56,11 +56,14 @@ r('''
 def eval_features(X, ac, metric, individual):
     """Evaluate individual according to silhouette score."""
     prediction = ac.fit(X * individual).labels_
-    if metric != 'silhouette_sklearn':
+    if metric == 'min_silhouette_sklearn':
+        index1 = np.min(silhouette_samples(X, prediction))
+    elif metric == 'silhouette_sklearn':
+        index1 = silhouette_score(X, prediction)
+    else:
         index1 = r['unique_criteria'](X, prediction, metric)
         index1 = np.asarray(index1)[0][0]
-    else:
-        index1 = silhouette_score(X, prediction)
+
 
     if 'silhouette' in metric:
         index1 += 1
@@ -89,12 +92,13 @@ def evaluate_rate_metrics(X, y, ac, individual):
     int_idx = [val[0] for val in list(int_idx)]
 
     silhouette = silhouette_score(X, prediction)
+    min_silhouette = np.min(silhouette_samples(X, prediction))
     adj_rand = adjusted_rand_score(y, prediction)
     f1 = f1_score(y, y_prediction, average='weighted')
     acc = accuracy_score(y, y_prediction)
     complexity = int(np.sum(individual))
 
-    return tuple(int_idx) + (acc, f1, adj_rand, silhouette, complexity)
+    return tuple(int_idx) + (acc, f1, adj_rand, silhouette, min_silhouette, complexity)
 
 
 def feature_relevance(X, y):
@@ -260,7 +264,7 @@ def main():
     own_script_text = own_script.read()
     own_script.close()
 
-    df = pd.read_csv(args.input_file, index_col=0)
+    df = pd.read_csv(args.input_file, index_col=0, header=0)
 
     y = df['petrofacie'].as_matrix()
     del df['petrofacie']
@@ -316,6 +320,9 @@ def main():
     toolbox.decorate("mutate", check_bounds(args.min_features, args.max_features))
 
     population = toolbox.population(n=args.pop_size)
+    ind = random.choice(range(len(population)))
+    for i, _ in enumerate(population[ind]):
+        population[ind][i] = 1
     population = list(toolbox.map(partial(force_bounds, args.min_features, args.max_features), population))
     evaluate(toolbox, population)
 
@@ -406,9 +413,9 @@ def main():
                           'Davies_Bouldin', 'Dunn', 'Gamma', 'G_plus', 'GDI11', 'GDI12', 'GDI13', 'GDI21',
                           'GDI22', 'GDI23', 'GDI31', 'GDI32', 'GDI33', 'GDI41', 'GDI42', 'GDI43', 'GDI51',
                           'GDI52', 'GDI53', 'McClain_Rao', 'PBM', 'Point_Biserial', 'Ray_Turi',
-                          'Ratkowsky_Lance', 'SD_Scat', 'SD_Dis', 'Silhouette', 'Tau', 'Wemmert_Gancarski']
+                          'Ratkowsky_Lance', 'SD_Scat', 'SD_Dis', 'Silhouette',  'Tau', 'Wemmert_Gancarski']
         correlation.columns = criteria_names + [
-            'accuracy', 'f1_score', 'adjusted_rand_score', 'silhouette_sklearn', 'complexity']
+            'accuracy', 'f1_score', 'adjusted_rand_score', 'silhouette_sklearn', 'min_silhouette_sklearn', 'complexity']
         correlation = correlation.reset_index(drop=True)
 
         correlation.to_csv(

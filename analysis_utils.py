@@ -35,34 +35,70 @@ def argument_parser():
     parser.add_argument('-t', '--petrel', action='store_true', help='')
     parser.add_argument('-u', '--useful-features', action='store_true', help='')
     parser.add_argument('-b', '--clear-incomplete-outputs', action='store_true', help='')
+    parser.add_argument('-e', '--melt-results', action='store_true', help='')
+    parser.add_argument('-d', '--average-feature-selection', action='store_true', help='')
 
     args = parser.parse_args()
 
     if sum([args.plot_correlation, args.correlation,
             args.feature_analysis, args.merge_results,
             args.petrel, args.useful_features, args.merge_feature_selection,
-            args.clear_incomplete_outputs]) != 1:
+            args.clear_incomplete_outputs, args.melt_results,
+            args.average_feature_selection]) != 1:
         raise ValueError("Cannot have this combination of arguments.")
 
     return args
 
 
-def plot_correlation(df, args):
+def plot_correlation(args):
+    summary_files = glob.glob(args.input_file + '/dataset_analysis*_metrics.csv')
+    summary_files.sort(key=os.path.getmtime, reverse=True)
+    print('Found ' + str(len(summary_files)) + ' files')
+    summary_files = summary_files[:min(len(summary_files), args.n_last_results)]
+    print('Processing ' + str(len(summary_files)) + ' files:')
+    dfs = [pd.read_csv(summary, index_col=0) for summary in summary_files]
+    df = pd.concat(dfs)
+    df = df.reset_index().sample(frac=(1/len(summary_files)))
+    df['index'] = df['index'].apply(lambda x: round(float(x)/128))
+    df = df.sort_values(by='index')
+
     plt.figure()
-    if args.color == 'index':
-        points = plt.scatter(df[args.axis1],
-                            df[args.axis2],
-                            c=df.index.values,
-                            s=3, cmap='viridis', alpha=0.7)
-        plt.colorbar(points, label='index')
-    else:
-        points = plt.scatter(df[args.axis1],
-                            df[args.axis2],
-                            c=df[args.color],
-                            s=3, cmap='viridis', alpha=0.7)
-        plt.colorbar(points, label=args.color)
+    points = plt.scatter(df[args.axis1],
+                        df[args.axis2],
+                        c=df[args.color],
+                        s=1, cmap='viridis', alpha=0.5)
+    plt.colorbar(points, label=args.color)
         
-    sns.regplot(args.axis1, args.axis2, data=df, scatter=False, x_jitter=0.05, y_jitter=0.05, order=1, robust=False)
+    sns.regplot(args.axis1, args.axis2, data=df, scatter=False, x_jitter=0.005, y_jitter=0.005, order=1, robust=False)
+
+    if args.output_file:
+        plt.savefig(args.output_file, dpi=600)
+    else:
+        plt.show()
+
+
+def melt_results(args):
+    summary_files = glob.glob(args.input_file + '/dataset_analysis*_metrics.csv')
+    summary_files.sort(key=os.path.getmtime, reverse=True)
+    print('Found ' + str(len(summary_files)) + ' files')
+    summary_files = summary_files[:min(len(summary_files), args.n_last_results)]
+    print('Processing ' + str(len(summary_files)) + ' files:')
+
+    dfs = [pd.read_csv(summary, index_col=0) for summary in summary_files]
+    for i, df in enumerate(dfs):
+        df['trial'] = pd.Series([i]*df.shape[0])
+
+    df = pd.concat(dfs)
+    df = df.reset_index()
+    df['index'] = df['index'].apply(lambda x: round(float(x)/128))
+
+    fig, ax = plt.subplots()
+
+    for key, grp in df.groupby(['trial', 'index']):
+        print(grp)
+        ax = grp.mean().plot(ax=ax, kind='line', x='index', y='silhouette_sklearn', c=key, label=key)
+
+    plt.legend(loc='best')
 
     if args.output_file:
         plt.savefig(args.output_file, dpi=600)
@@ -220,12 +256,23 @@ def clear_incomplete_experiments(args):
     print('Done!')
 
 
+def average_feature_selection(args):
+    summary_files = glob.glob(args.input_file + '/dataset_analysis*_filtered_dataset.csv')
+    summary_files.sort(key=os.path.getmtime, reverse=True)
+    print('Found ' + str(len(summary_files)) + ' files')
+    summary_files = summary_files[:min(len(summary_files), args.n_last_results)]
+    print('Processing ' + str(len(summary_files)) + ' files:')
+
+    dfs = list(map(partial(pd.read_csv, index_col=0), summary_files))
+    avg_n_features = np.average([df.shape[1] for df in dfs])
+    
+    print('Average number of features: {0}'.format(avg_n_features))
+
 def main():
     args = argument_parser()
 
     if args.plot_correlation:
-        df = pd.read_csv(args.input_file, index_col=0)
-        plot_correlation(df, args)
+        plot_correlation(args)
     elif args.correlation:
         df = pd.read_csv(args.input_file, index_col=0)
         correlation_calculation(df, args)
@@ -241,6 +288,10 @@ def main():
         merge_feature_selection(args)
     elif args.clear_incomplete_outputs:
         clear_incomplete_experiments(args)
+    elif args.melt_results:
+        melt_results(args)
+    elif args.average_feature_selection:
+        average_feature_selection(args)
 
 
 def class_cluster_match(y_true, y_pred):
