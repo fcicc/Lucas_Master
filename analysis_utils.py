@@ -5,11 +5,8 @@ import matplotlib.pyplot as plt
 import os
 import csv
 import argparse
-import random
 import glob
 import re
-import sys
-from io import StringIO
 from functools import partial
 
 from sklearn.metrics.cluster import contingency_matrix
@@ -37,6 +34,9 @@ def argument_parser():
     parser.add_argument('-b', '--clear-incomplete-outputs', action='store_true', help='')
     parser.add_argument('-e', '--melt-results', action='store_true', help='')
     parser.add_argument('-d', '--average-feature-selection', action='store_true', help='')
+    parser.add_argument('-s', '--feature-relevance', action='store_true', help='')
+    parser.add_argument('-j', '--n-by-k-scores', action='store_true')
+    parser.add_argument('-k', '--number-of-trials', type=int, help='', default=5)
 
     args = parser.parse_args()
 
@@ -44,10 +44,85 @@ def argument_parser():
             args.feature_analysis, args.merge_results,
             args.petrel, args.useful_features, args.merge_feature_selection,
             args.clear_incomplete_outputs, args.melt_results,
-            args.average_feature_selection]) != 1:
+            args.average_feature_selection, args.feature_relevance,
+            args.n_by_k_scores]) != 1:
         raise ValueError("Cannot have this combination of arguments.")
 
     return args
+
+
+def read_final_score(path):
+    f = open(path)
+
+    float_re = '[-+]?[0-9]*\.?[0-9]*'
+    df = {}
+    while True:
+        line = f.readline().strip().lower()
+        if line == 'summary:':
+            result_lines = [f.readline().strip().lower() for _ in range(8)]
+            df['accuracy'] = re.search('accuracy score\s+({0})'.format(float_re), result_lines[0]).group(1)
+            df['ari'] = re.search('adjusted rand score\s+({0})'.format(float_re), result_lines[1]).group(1)
+            df['ch'] = re.search('calinski harabaz score\s+({0})'.format(float_re), result_lines[2]).group(1)
+            df['fmeasure'] = re.search('f1 score\s+({0})'.format(float_re), result_lines[3]).group(1)
+            df['final_features'] = re.search('final number of features\s+({0})'.format(float_re), result_lines[5]).group(1)
+            df['initial_features'] = re.search('initial number of features\s+({0})'.format(float_re), result_lines[6]).group(1)
+            df['silhouette'] = re.search('silhouette score\s+({0})'.format(float_re), result_lines[7]).group(1)
+            break
+
+    f.close()
+
+    for key, val in df.items():
+        df[key] = [float(df[key])]
+
+    return pd.DataFrame.from_dict(df)
+
+
+def n_by_k_results(args):
+    summary_files = glob.glob(args.input_file + '/dataset_analysis*.txt')
+    summary_files.sort(key=os.path.getmtime, reverse=True)
+    n = args.n_last_results
+    k = args.number_of_trials
+    print('Found ' + str(len(summary_files)) + ' files')
+    summary_files = summary_files[:min(len(summary_files), n*k)]
+    print('Processing ' + str(len(summary_files)) + ' files')
+
+    scores = []
+    for i in range(n):
+        df = pd.concat([read_final_score(path) for path in summary_files[i*k:i*k+k]])
+        df['trial'] = pd.Series([n-i]*df.shape[0])
+        scores.append(df)
+    
+    scores = pd.concat(scores)
+
+    # scores.boxplot(by='trial', column=['accuracy', 'ari', 'fmeasure', 'silhouette'], layout=(4,1))
+    box_keys = []
+    box_data = {'final_features': [],
+                'accuracy': [],
+                'fmeasure': [],
+                'silhouette': []}
+    for key, grp in scores.groupby('trial'):
+        box_keys.append(int(key)*5)
+        box_data['final_features'].append(grp['final_features'].mean())
+        box_data['accuracy'].append(grp['accuracy'].mean())
+        box_data['fmeasure'].append(grp['fmeasure'].mean())
+        box_data['silhouette'].append(grp['silhouette'].mean())
+        
+
+    fig, ax1 = plt.subplots()
+
+    box_keys = [str(key) if i%10==0 else ''  for i, key in enumerate(box_keys)]
+    ax1.plot(box_data['final_features'])
+
+    ax2 = ax1.twinx()
+    ax2.plot(box_data['accuracy'], label='accuracy')
+    ax2.plot(box_data['fmeasure'], label='fmeasure')
+    ax2.plot(box_data['silhouette'], label='silhouette')
+
+    plt.legend()
+    if args.output_file:
+        plt.savefig(args.output_file, dpi=600)
+    else:
+        plt.show()
 
 
 def plot_correlation(args):
@@ -206,13 +281,23 @@ def petrofacies_to_petrel(df, args):
         file2.close()
 
 
-def find_useful_features(df, args):
-    description = df.groupby('petrofacie').var()
+def find_useful_features(args):
+    df = pd.read_csv(args.input_file, index_col=0)
+    del df['petrofacie']
+
+    full_std = df.std()
+
+    groups_std = {}
+    for key, group in df.groupby('predicted labels'):
+        groups_std[key] = full_std / (group.std()+1)
+
+    df = pd.DataFrame.from_dict(groups_std)
+    df['full std'] = full_std
 
     if args.output_file:
-        description.to_csv(args.output_file, quoting=csv.QUOTE_NONNUMERIC, float_format='%.10f', index=True)
+        df.to_csv(args.output_file, quoting=csv.QUOTE_NONNUMERIC, float_format='%.10f', index=True)
     else:
-        print(description)
+        print(df)
 
 
 def merge_feature_selection(args):
@@ -268,6 +353,7 @@ def average_feature_selection(args):
     
     print('Average number of features: {0}'.format(avg_n_features))
 
+
 def main():
     args = argument_parser()
 
@@ -279,8 +365,7 @@ def main():
     elif args.merge_results:
         merge_results(args)
     elif args.useful_features:
-        df = pd.read_csv(args.input_file, index_col=0)
-        find_useful_features(df, args)
+        find_useful_features(args)
     elif args.petrel:
         df = pd.read_csv(args.input_file, index_col=0)
         petrofacies_to_petrel(df, args)
@@ -292,6 +377,8 @@ def main():
         melt_results(args)
     elif args.average_feature_selection:
         average_feature_selection(args)
+    elif args.n_by_k_scores:
+        n_by_k_results(args)
 
 
 def class_cluster_match(y_true, y_pred):

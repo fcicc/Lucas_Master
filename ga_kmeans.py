@@ -284,9 +284,10 @@ def main():
 
     samples_dist_matrix = distance.squareform(distance.pdist(dataset_matrix))
 
-    ac = cluster.AgglomerativeClustering(n_clusters=len(unique_labels(y)),
-                                         affinity='manhattan',
-                                         linkage='complete')
+    # ac = cluster.AgglomerativeClustering(n_clusters=len(unique_labels(y)),
+    #                                      affinity='manhattan',
+    #                                      linkage='complete')
+    ac = cluster.KMeans(n_clusters=len(unique_labels(y)), n_init=10)
 
     weight = [fit[1] for fit in ALLOWED_FITNESSES if fit[0] == args.fitness_metric][0]
     creator.create("FitnessMax", base.Fitness,
