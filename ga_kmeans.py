@@ -287,7 +287,7 @@ def main():
     # ac = cluster.AgglomerativeClustering(n_clusters=len(unique_labels(y)),
     #                                      affinity='manhattan',
     #                                      linkage='complete')
-    ac = cluster.KMeans(n_clusters=len(unique_labels(y)), n_init=10)
+    ac = cluster.KMeans(n_clusters=len(unique_labels(y)), n_init=100)
 
     weight = [fit[1] for fit in ALLOWED_FITNESSES if fit[0] == args.fitness_metric][0]
     creator.create("FitnessMax", base.Fitness,
@@ -318,8 +318,8 @@ def main():
     if len(unique_labels(y)) > args.min_features:
         args.min_features = len(unique_labels(y))
         output_summary.write('setting minimum number of features to ' + str(args.min_features) + '\n\n')
-    toolbox.decorate("mate", check_bounds(args.min_features, args.max_features))
-    toolbox.decorate("mutate", check_bounds(args.min_features, args.max_features))
+    # toolbox.decorate("mate", check_bounds(args.min_features, args.max_features))
+    # toolbox.decorate("mutate", check_bounds(args.min_features, args.max_features))
 
     population = toolbox.population(n=args.pop_size)
     ind = random.choice(range(len(population)))
@@ -442,6 +442,7 @@ def main():
 
     dataset['petrofacie'] = y
     dataset.index = index
+    dataset['predicted labels'] = pd.Series(y_prediction)
     dataset[best_features +
             ['petrofacie']].to_csv(
         os.path.join(input_dir,

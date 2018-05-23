@@ -317,8 +317,8 @@ def main():
     if len(unique_labels(y)) > args.min_features:
         args.min_features = len(unique_labels(y))
         output_summary.write('setting minimum number of features to ' + str(args.min_features) + '\n\n')
-    toolbox.decorate("mate", check_bounds(args.min_features, args.max_features))
-    toolbox.decorate("mutate", check_bounds(args.min_features, args.max_features))
+    # toolbox.decorate("mate", check_bounds(args.min_features, args.max_features))
+    # toolbox.decorate("mutate", check_bounds(args.min_features, args.max_features))
 
     population = toolbox.population(n=args.pop_size)
     ind = random.choice(range(len(population)))
@@ -440,9 +440,10 @@ def main():
         index=True)
 
     dataset['petrofacie'] = y
+    dataset['predicted labels'] = pd.Series(y_prediction)
     dataset.index = index
     dataset[best_features +
-            ['petrofacie']].to_csv(
+            ['petrofacie', 'predicted labels']].to_csv(
         os.path.join(input_dir,
                      'dataset_analysis{0}_filtered_dataset.csv'.format(exec_label)),
         quoting=csv.QUOTE_NONNUMERIC,

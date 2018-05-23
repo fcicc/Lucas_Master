@@ -25,7 +25,6 @@ def argument_parser():
     parser.add_argument('--axis2', type=str, help='''second plot axis''')
     parser.add_argument('--color', type=str, help='''point color''', default='index')
     parser.add_argument('-c', '--correlation', action='store_true', help='generates correlation matrix')
-    parser.add_argument('-f', '--feature-analysis', action='store_true', help='')
     parser.add_argument('-m', '--merge-results', action='store_true', help='')
     parser.add_argument('-a', '--merge-feature-selection', action='store_true', help='')
     parser.add_argument('-n', '--n-last-results', type=int, help='', default=10)
@@ -34,18 +33,16 @@ def argument_parser():
     parser.add_argument('-b', '--clear-incomplete-outputs', action='store_true', help='')
     parser.add_argument('-e', '--melt-results', action='store_true', help='')
     parser.add_argument('-d', '--average-feature-selection', action='store_true', help='')
-    parser.add_argument('-s', '--feature-relevance', action='store_true', help='')
     parser.add_argument('-j', '--n-by-k-scores', action='store_true')
     parser.add_argument('-k', '--number-of-trials', type=int, help='', default=5)
 
     args = parser.parse_args()
 
     if sum([args.plot_correlation, args.correlation,
-            args.feature_analysis, args.merge_results,
-            args.petrel, args.useful_features, args.merge_feature_selection,
+            args.merge_results, args.petrel,
+            args.useful_features, args.merge_feature_selection,
             args.clear_incomplete_outputs, args.melt_results,
-            args.average_feature_selection, args.feature_relevance,
-            args.n_by_k_scores]) != 1:
+            args.average_feature_selection, args.n_by_k_scores]) != 1:
         raise ValueError("Cannot have this combination of arguments.")
 
     return args
@@ -197,29 +194,11 @@ def merge_results(args):
     summary_files = summary_files[:min(len(summary_files), args.n_last_results)]
     print('Processing ' + str(len(summary_files)) + ' files:')
 
-    all_results = {'Accuracy': [],
-                   'Adjusted Rand score': [],
-                   'F-Measure': [],
-                   'Silhouette': [],
-                   'Complexity reduction rate': []}
-    for i, file in enumerate(summary_files):
-        file_buf = open(file)
-        lines = file_buf.readlines()
-        metric = re.search('fitness_metric=\'(.*?)\'', lines[0]).group(1)
-        print('\t' + str(i + 1) + ': ' + file + ' - ' + metric)
-        interest_section = ''.join(lines[2:15])
-        all_results['Accuracy'].append(
-            float(re.search('accuracy score\s+([-+]?[0-9]*\.?[0-9]*)', interest_section).group(1)))
-        all_results['Adjusted Rand score'].append(
-            float(re.search('adjusted Rand score\s+([-+]?[0-9]*\.?[0-9]*)', interest_section).group(1)))
-        all_results['F-Measure'].append(
-            float(re.search('f1 score\s+([-+]?[0-9]*\.?[0-9]*)', interest_section).group(1)))
-        all_results['Silhouette'].append(
-            float(re.search('silhouette score\s+([-+]?[0-9]*\.?[0-9]*)', interest_section).group(1)))
-        all_results['Complexity reduction rate'].append(
-            float(re.search('feature reduction rate\s+([-+]?[0-9]*\.?[0-9]*)', interest_section).group(1)))
+    scores = []
+    for path in summary_files:
+        scores.append(read_final_score(path))
 
-    all_results = pd.DataFrame.from_dict(all_results)
+    all_results = pd.concat(scores)
 
     if args.output_file:
         all_results.to_csv(args.output_file, quoting=csv.QUOTE_NONNUMERIC, float_format='%.10f', index=True)
@@ -289,10 +268,14 @@ def find_useful_features(args):
 
     groups_std = {}
     for key, group in df.groupby('predicted labels'):
-        groups_std[key] = full_std / (group.std()+1)
+        groups_std[key] = full_std / group.std()
+        for i, column in enumerate(group):
+            if group[column].apply(lambda x: x==0).all():
+                groups_std[key][column] = pd.Series([0])
 
     df = pd.DataFrame.from_dict(groups_std)
     df['full std'] = full_std
+    df.sort_values(by=['full std'])
 
     if args.output_file:
         df.to_csv(args.output_file, quoting=csv.QUOTE_NONNUMERIC, float_format='%.10f', index=True)
