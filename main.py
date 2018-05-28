@@ -116,8 +116,10 @@ def run():
     adj_rand_score = adjusted_rand_score(y, best_prediction)
     silhouette = silhouette_score(dataset[best_features], best_prediction)
 
-    store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_features, final_n_features, start_time,
-                  end_time, cm, args, y_prediction, args.experiment_name)
+    result_id = store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_features, final_n_features, start_time,
+                  end_time, cm, args, best_features, args.experiment_name)
+
+    print(f'Results stored under the ID {result_id}')
 
 
 if __name__ == '__main__':

@@ -35,16 +35,29 @@ class Result(Base):
 
     args = relationship("Arg", back_populates="result")
     confusion_matrix = relationship("ConfusionMatrix", uselist=False, back_populates="result")
+    selected_features = relationship("SelectedFeature", uselist=True)
 
-    def __str__(self):
+    def details(self):
         args_str = '\n\t\t'.join(list(map(str, self.args)))
-        return f'''{self.name} - {self.start_time}
+        features_str = '\n\t\t'.join(list(map(str, self.selected_features)))
+        return f'''{self.id}: {self.name} - {self.start_time}
     F-Measure   {self.f_measure}
     Accuracy    {self.accuracy}
     Args:
         {args_str}
     Confusion Matrix:
-        {self.confusion_matrix}
+    {self.confusion_matrix}
+    Selected Features:
+    {features_str}
+    '''
+
+    def __str__(self):
+        args_str = '\n\t\t'.join(list(map(str, self.args)))
+        return f'''{self.id}: {self.name} - {self.start_time}
+    F-Measure   {self.f_measure}
+    Accuracy    {self.accuracy}
+    Args:
+        {args_str}
     '''
 
 
@@ -99,6 +112,9 @@ class ConfusionMatrixNumber(Base):
 class SelectedFeature(Base):
     result_id = Column(Integer, ForeignKey('result.id'), nullable=False)
     column = Column(String)
+
+    def __str__(self):
+        return str(self.column)
 
 
 class ClusterLabel(Base):

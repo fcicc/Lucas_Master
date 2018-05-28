@@ -91,4 +91,7 @@ def store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_fea
     session.add_all(selected_features_entries)
 
     session.commit()
+    result_entry_id = result_entry.id
     session.close()
+
+    return result_entry_id

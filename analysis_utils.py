@@ -12,7 +12,7 @@ from functools import partial
 from sklearn.metrics.cluster import contingency_matrix
 from sklearn.utils.linear_assignment_ import linear_assignment
 from sklearn.utils.multiclass import unique_labels
-from sqlalchemy import create_engine, desc
+from sqlalchemy import create_engine, desc, asc
 from sqlalchemy.orm import sessionmaker
 
 from orm_models import Result
@@ -40,6 +40,8 @@ def argument_parser() -> argparse.Namespace:
     parser.add_argument('-j', '--n-by-k-scores', action='store_true')
     parser.add_argument('-k', '--number-of-trials', type=int, help='', default=5)
     parser.add_argument('-s', '--list-results', action='store_true')
+    parser.add_argument('-r', '--list-result', action='store_true')
+    parser.add_argument('--id', type=int, default=None)
 
     args = parser.parse_args()
 
@@ -48,7 +50,7 @@ def argument_parser() -> argparse.Namespace:
             args.useful_features, args.merge_feature_selection,
             args.clear_incomplete_outputs, args.melt_results,
             args.average_feature_selection, args.n_by_k_scores,
-            args.list_results]) != 1:
+            args.list_results, args.list_result]) != 1:
         raise ValueError("Cannot have this combination of arguments.")
 
     return args
@@ -114,7 +116,6 @@ def n_by_k_results(args):
 
     fig, ax1 = plt.subplots()
 
-    box_keys = [str(key) if i % 10 == 0 else '' for i, key in enumerate(box_keys)]
     ax1.plot(box_data['final_features'])
 
     ax2 = ax1.twinx()
@@ -353,10 +354,22 @@ def show_results():
     Session = sessionmaker(bind=engine)
     session = Session()
 
-    results = session.query(Result).order_by(desc(Result.start_time)).all()
+    results = session.query(Result).order_by(asc(Result.start_time)).all()
 
     for result in results:
         print(result)
+    session.close()
+
+
+def show_result(args):
+    engine = create_engine('sqlite:///local.db', echo=False)
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    result = session.query(Result).order_by(desc(Result.start_time)).filter(Result.id == args.id).first()
+    print(result.details())
+
+    session.close()
 
 
 def main():
@@ -386,6 +399,8 @@ def main():
         n_by_k_results(args)
     elif args.list_results:
         show_results()
+    elif args.list_result:
+        show_result(args)
 
 
 def class_cluster_match(y_true, y_pred):
