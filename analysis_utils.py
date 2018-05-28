@@ -12,13 +12,17 @@ from functools import partial
 from sklearn.metrics.cluster import contingency_matrix
 from sklearn.utils.linear_assignment_ import linear_assignment
 from sklearn.utils.multiclass import unique_labels
+from sqlalchemy import create_engine, desc
+from sqlalchemy.orm import sessionmaker
+
+from orm_models import Result
 
 
-def argument_parser():
+def argument_parser() -> argparse.Namespace:
     """Parse input arguments."""
     parser = argparse.ArgumentParser(
         description='''Analysis over input data''')
-    parser.add_argument('input_file', type=str, help='''input CSV file''')
+    parser.add_argument('--input_file', type=str, help='''input CSV file''', default=None)
     parser.add_argument('-o', '--output_file', type=str, help='''output file''')
     parser.add_argument('-p', '--plot-correlation', action='store_true', help='plot correlation')
     parser.add_argument('--axis1', type=str, help='''first plot axis''')
@@ -35,6 +39,7 @@ def argument_parser():
     parser.add_argument('-d', '--average-feature-selection', action='store_true', help='')
     parser.add_argument('-j', '--n-by-k-scores', action='store_true')
     parser.add_argument('-k', '--number-of-trials', type=int, help='', default=5)
+    parser.add_argument('-s', '--list-results', action='store_true')
 
     args = parser.parse_args()
 
@@ -42,7 +47,8 @@ def argument_parser():
             args.merge_results, args.petrel,
             args.useful_features, args.merge_feature_selection,
             args.clear_incomplete_outputs, args.melt_results,
-            args.average_feature_selection, args.n_by_k_scores]) != 1:
+            args.average_feature_selection, args.n_by_k_scores,
+            args.list_results]) != 1:
         raise ValueError("Cannot have this combination of arguments.")
 
     return args
@@ -61,8 +67,10 @@ def read_final_score(path):
             df['ari'] = re.search('adjusted rand score\s+({0})'.format(float_re), result_lines[1]).group(1)
             df['ch'] = re.search('calinski harabaz score\s+({0})'.format(float_re), result_lines[2]).group(1)
             df['fmeasure'] = re.search('f1 score\s+({0})'.format(float_re), result_lines[3]).group(1)
-            df['final_features'] = re.search('final number of features\s+({0})'.format(float_re), result_lines[5]).group(1)
-            df['initial_features'] = re.search('initial number of features\s+({0})'.format(float_re), result_lines[6]).group(1)
+            df['final_features'] = re.search('final number of features\s+({0})'.format(float_re),
+                                             result_lines[5]).group(1)
+            df['initial_features'] = re.search('initial number of features\s+({0})'.format(float_re),
+                                               result_lines[6]).group(1)
             df['silhouette'] = re.search('silhouette score\s+({0})'.format(float_re), result_lines[7]).group(1)
             break
 
@@ -80,15 +88,15 @@ def n_by_k_results(args):
     n = args.n_last_results
     k = args.number_of_trials
     print('Found ' + str(len(summary_files)) + ' files')
-    summary_files = summary_files[:min(len(summary_files), n*k)]
+    summary_files = summary_files[:min(len(summary_files), n * k)]
     print('Processing ' + str(len(summary_files)) + ' files')
 
     scores = []
     for i in range(n):
-        df = pd.concat([read_final_score(path) for path in summary_files[i*k:i*k+k]])
-        df['trial'] = pd.Series([n-i]*df.shape[0])
+        df = pd.concat([read_final_score(path) for path in summary_files[i * k:i * k + k]])
+        df['trial'] = pd.Series([n - i] * df.shape[0])
         scores.append(df)
-    
+
     scores = pd.concat(scores)
 
     # scores.boxplot(by='trial', column=['accuracy', 'ari', 'fmeasure', 'silhouette'], layout=(4,1))
@@ -98,16 +106,15 @@ def n_by_k_results(args):
                 'fmeasure': [],
                 'silhouette': []}
     for key, grp in scores.groupby('trial'):
-        box_keys.append(int(key)*5)
+        box_keys.append(int(key) * 5)
         box_data['final_features'].append(grp['final_features'].mean())
         box_data['accuracy'].append(grp['accuracy'].mean())
         box_data['fmeasure'].append(grp['fmeasure'].mean())
         box_data['silhouette'].append(grp['silhouette'].mean())
-        
 
     fig, ax1 = plt.subplots()
 
-    box_keys = [str(key) if i%10==0 else ''  for i, key in enumerate(box_keys)]
+    box_keys = [str(key) if i % 10 == 0 else '' for i, key in enumerate(box_keys)]
     ax1.plot(box_data['final_features'])
 
     ax2 = ax1.twinx()
@@ -130,17 +137,17 @@ def plot_correlation(args):
     print('Processing ' + str(len(summary_files)) + ' files:')
     dfs = [pd.read_csv(summary, index_col=0) for summary in summary_files]
     df = pd.concat(dfs)
-    df = df.reset_index().sample(frac=(1/len(summary_files)))
-    df['index'] = df['index'].apply(lambda x: round(float(x)/128))
+    df = df.reset_index().sample(frac=(1 / len(summary_files)))
+    df['index'] = df['index'].apply(lambda x: round(float(x) / 128))
     df = df.sort_values(by='index')
 
     plt.figure()
     points = plt.scatter(df[args.axis1],
-                        df[args.axis2],
-                        c=df[args.color],
-                        s=1, cmap='viridis', alpha=0.5)
+                         df[args.axis2],
+                         c=df[args.color],
+                         s=1, cmap='viridis', alpha=0.5)
     plt.colorbar(points, label=args.color)
-        
+
     sns.regplot(args.axis1, args.axis2, data=df, scatter=False, x_jitter=0.005, y_jitter=0.005, order=1, robust=False)
 
     if args.output_file:
@@ -158,11 +165,11 @@ def melt_results(args):
 
     dfs = [pd.read_csv(summary, index_col=0) for summary in summary_files]
     for i, df in enumerate(dfs):
-        df['trial'] = pd.Series([i]*df.shape[0])
+        df['trial'] = pd.Series([i] * df.shape[0])
 
     df = pd.concat(dfs)
     df = df.reset_index()
-    df['index'] = df['index'].apply(lambda x: round(float(x)/128))
+    df['index'] = df['index'].apply(lambda x: round(float(x) / 128))
 
     fig, ax = plt.subplots()
 
@@ -270,7 +277,7 @@ def find_useful_features(args):
     for key, group in df.groupby('predicted labels'):
         groups_std[key] = full_std / group.std()
         for i, column in enumerate(group):
-            if group[column].apply(lambda x: x==0).all():
+            if group[column].apply(lambda x: x == 0).all():
                 groups_std[key][column] = pd.Series([0])
 
     df = pd.DataFrame.from_dict(groups_std)
@@ -301,20 +308,24 @@ def merge_feature_selection(args):
         results_df.to_csv(args.output_file, quoting=csv.QUOTE_NONNUMERIC, float_format='%.10f', index=True)
     else:
         print(results_df)
-        
+
 
 def clear_incomplete_experiments(args):
     """Search the input directory for incomplete run files and erase them."""
     results_regex = os.path.join(args.input_file,
-                    "dataset_analysis{0},{1}_{2}_{3}-{4}_{5}_{6}.txt".format(('[0-9a-fA-F]' * 7),('[0-9]' * 4), (
-                                        '[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2)))
+                                 "dataset_analysis{0},{1}_{2}_{3}-{4}_{5}_{6}.txt".format(('[0-9a-fA-F]' * 7),
+                                                                                          ('[0-9]' * 4), (
+                                                                                                  '[0-9]' * 2),
+                                                                                          ('[0-9]' * 2), ('[0-9]' * 2),
+                                                                                          ('[0-9]' * 2), ('[0-9]' * 2)))
     summary_files = glob.glob(results_regex)
 
     for summary_file in summary_files:
         summary_file_name = os.path.basename(summary_file)
-        file_id = re.search("dataset_analysis({0},{1}_{2}_{3}-{4}_{5}_{6}).txt".format(('[0-9a-fA-F]' * 7),('[0-9]' * 4), (
-                                        '[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2)),
-                                        summary_file_name).group(1)
+        file_id = re.search(
+            "dataset_analysis({0},{1}_{2}_{3}-{4}_{5}_{6}).txt".format(('[0-9a-fA-F]' * 7), ('[0-9]' * 4), (
+                    '[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2)),
+            summary_file_name).group(1)
         related_files = glob.glob(args.input_file + '/*{0}*'.format(file_id))
         if len(related_files) < 4:
             print('Erasing files from execution {0}'.format(file_id))
@@ -333,8 +344,19 @@ def average_feature_selection(args):
 
     dfs = list(map(partial(pd.read_csv, index_col=0), summary_files))
     avg_n_features = np.average([df.shape[1] for df in dfs])
-    
+
     print('Average number of features: {0}'.format(avg_n_features))
+
+
+def show_results():
+    engine = create_engine('sqlite:///local.db', echo=False)
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    results = session.query(Result).order_by(desc(Result.start_time)).all()
+
+    for result in results:
+        print(result)
 
 
 def main():
@@ -362,6 +384,8 @@ def main():
         average_feature_selection(args)
     elif args.n_by_k_scores:
         n_by_k_results(args)
+    elif args.list_results:
+        show_results()
 
 
 def class_cluster_match(y_true, y_pred):
@@ -409,9 +433,9 @@ def class_cluster_match(y_true, y_pred):
     n_clusters = len(clusters)
 
     if n_clusters > n_classes:
-        classes += ['DEF_CLASS'+str(i) for i in range(n_clusters-n_classes)]
+        classes += ['DEF_CLASS' + str(i) for i in range(n_clusters - n_classes)]
     elif n_classes > n_clusters:
-        clusters += ['DEF_CLUSTER'+str(i) for i in range(n_classes-n_clusters)]
+        clusters += ['DEF_CLUSTER' + str(i) for i in range(n_classes - n_clusters)]
 
     C = contingency_matrix(y_true, y_pred)
     true_idx, pred_idx = linear_assignment(-C).T
