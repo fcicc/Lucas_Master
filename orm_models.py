@@ -1,10 +1,17 @@
 import re
+from typing import List
 
 import numpy as np
 import pandas as pd
-from sqlalchemy import Column, Integer, DateTime, Float, ForeignKey, String
+from sqlalchemy import Column, Integer, DateTime, Float, ForeignKey, String, PickleType
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.orm import relationship
+
+DB_NAME = 'local.db'
+# CONN_STRING = f'sqlite+pysqlcipher://{DB_NAME}'''
+CONN_STRING = f'sqlite:///{DB_NAME}'''
+# PASSWORD = open('./pass.txt', 'r').read()
+# CONN_STRING = f'mysql+pymysql://root:{PASSWORD}@localhost/mestrado'
 
 
 class Base(object):
@@ -20,51 +27,10 @@ class Base(object):
 Base = declarative_base(cls=Base)
 
 
-class Result(Base):
-    name = Column(String)
-
-    start_time = Column(DateTime)
-    end_time = Column(DateTime)
-
-    accuracy = Column(Float)
-    f_measure = Column(Float)
-    adjusted_rand_score = Column(Float)
-    silhouette = Column(Float)
-    initial_n_features = Column(Integer)
-    final_n_features = Column(Integer)
-
-    args = relationship("Arg", back_populates="result")
-    confusion_matrix = relationship("ConfusionMatrix", uselist=False, back_populates="result")
-    selected_features = relationship("SelectedFeature", uselist=True)
-
-    def details(self):
-        args_str = '\n\t\t'.join(list(map(str, self.args)))
-        features_str = '\n\t\t'.join(list(map(str, self.selected_features)))
-        return f'''{self.id}: {self.name} - {self.start_time}
-    F-Measure   {self.f_measure}
-    Accuracy    {self.accuracy}
-    Args:
-        {args_str}
-    Confusion Matrix:
-    {self.confusion_matrix}
-    Selected Features:
-    {features_str}
-    '''
-
-    def __str__(self):
-        args_str = '\n\t\t'.join(list(map(str, self.args)))
-        return f'''{self.id}: {self.name} - {self.start_time}
-    F-Measure   {self.f_measure}
-    Accuracy    {self.accuracy}
-    Args:
-        {args_str}
-    '''
-
-
 class Arg(Base):
     result_id = Column(Integer, ForeignKey('result.id'), nullable=False)
-    name = Column(String)
-    value = Column(String)
+    name = Column(String(64))
+    value = Column(String(64))
 
     result = relationship("Result", back_populates="args")
 
@@ -93,7 +59,7 @@ class ConfusionMatrix(Base):
 
 class ConfusionMatrixLabel(Base):
     confusion_matrix_id = Column(Integer, ForeignKey('confusion_matrix.id'), nullable=False)
-    label = Column(String)
+    label = Column(String(256))
     row_column = Column(Integer)
 
     confusion_matrix = relationship("ConfusionMatrix", back_populates="confusion_matrix_labels")
@@ -111,7 +77,7 @@ class ConfusionMatrixNumber(Base):
 
 class SelectedFeature(Base):
     result_id = Column(Integer, ForeignKey('result.id'), nullable=False)
-    column = Column(String)
+    column = Column(String(256))
 
     def __str__(self):
         return str(self.column)
@@ -119,4 +85,52 @@ class SelectedFeature(Base):
 
 class ClusterLabel(Base):
     result_id = Column(Integer, ForeignKey('result.id'), nullable=False)
-    label = Column(String)
+    label = Column(String(32))
+
+    def __str__(self):
+        return str(self.label)
+
+
+class Result(Base):
+    name = Column(String(32))
+
+    start_time = Column(DateTime)
+    end_time = Column(DateTime)
+
+    accuracy = Column(Float)
+    f_measure = Column(Float)
+    adjusted_rand_score = Column(Float)
+    silhouette = Column(Float)
+    initial_n_features = Column(Integer)
+    final_n_features = Column(Integer)
+    individual_evaluations: pd.DataFrame = Column(PickleType)
+
+    args: List[Arg] = relationship("Arg", back_populates="result", uselist=True)
+    confusion_matrix: ConfusionMatrix = relationship("ConfusionMatrix", uselist=False)
+    selected_features: List[SelectedFeature] = relationship("SelectedFeature", uselist=True)
+    result_labels: List[ClusterLabel] = relationship("ClusterLabel", uselist=True)
+
+    def details(self):
+        args_str = '\n\t\t'.join(list(map(str, self.args)))
+        features_str = '\n\t\t'.join(list(map(str, self.selected_features)))
+        labels_str = ','.join(list(map(str, self.result_labels)))
+        return f'''{self.id}: {self.name} - {self.start_time}
+    F-Measure   {self.f_measure}
+    Accuracy    {self.accuracy}
+    Args:
+        {args_str}
+    Result Labels: {labels_str}
+    Confusion Matrix:
+    {self.confusion_matrix}
+    Selected Features:
+    {features_str}
+    '''
+
+    def __str__(self):
+        args_str = '\n\t\t'.join(list(map(str, self.args)))
+        return f'''{self.id}: {self.name} - {self.start_time}
+    F-Measure   {self.f_measure}
+    Accuracy    {self.accuracy}
+    Args:
+        {args_str}
+    '''

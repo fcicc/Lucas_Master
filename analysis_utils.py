@@ -1,3 +1,6 @@
+import sys
+from typing import List
+
 import pandas as pd
 import seaborn as sns
 import numpy as np
@@ -13,9 +16,10 @@ from sklearn.metrics.cluster import contingency_matrix
 from sklearn.utils.linear_assignment_ import linear_assignment
 from sklearn.utils.multiclass import unique_labels
 from sqlalchemy import create_engine, desc, asc
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
 
-from orm_models import Result
+from orm_models import Result, DB_NAME, CONN_STRING
 
 
 def argument_parser() -> argparse.Namespace:
@@ -25,9 +29,9 @@ def argument_parser() -> argparse.Namespace:
     parser.add_argument('--input_file', type=str, help='''input CSV file''', default=None)
     parser.add_argument('-o', '--output_file', type=str, help='''output file''')
     parser.add_argument('-p', '--plot-correlation', action='store_true', help='plot correlation')
-    parser.add_argument('--axis1', type=str, help='''first plot axis''')
-    parser.add_argument('--axis2', type=str, help='''second plot axis''')
-    parser.add_argument('--color', type=str, help='''point color''', default='index')
+    parser.add_argument('--axis1', type=str, help='''first plot axis''', default='silhouette_sklearn')
+    parser.add_argument('--axis2', type=str, help='''second plot axis''', default='adjusted_rand_score')
+    parser.add_argument('--color', type=str, help='''point color''', default='generation')
     parser.add_argument('-c', '--correlation', action='store_true', help='generates correlation matrix')
     parser.add_argument('-m', '--merge-results', action='store_true', help='')
     parser.add_argument('-a', '--merge-feature-selection', action='store_true', help='')
@@ -42,6 +46,7 @@ def argument_parser() -> argparse.Namespace:
     parser.add_argument('-s', '--list-results', action='store_true')
     parser.add_argument('-r', '--list-result', action='store_true')
     parser.add_argument('--id', type=int, default=None)
+    parser.add_argument('--exp-name', type=str, default=None)
 
     args = parser.parse_args()
 
@@ -131,30 +136,74 @@ def n_by_k_results(args):
 
 
 def plot_correlation(args):
-    summary_files = glob.glob(args.input_file + '/dataset_analysis*_metrics.csv')
-    summary_files.sort(key=os.path.getmtime, reverse=True)
-    print('Found ' + str(len(summary_files)) + ' files')
-    summary_files = summary_files[:min(len(summary_files), args.n_last_results)]
-    print('Processing ' + str(len(summary_files)) + ' files:')
-    dfs = [pd.read_csv(summary, index_col=0) for summary in summary_files]
-    df = pd.concat(dfs)
-    df = df.reset_index().sample(frac=(1 / len(summary_files)))
-    df['index'] = df['index'].apply(lambda x: round(float(x) / 128))
-    df = df.sort_values(by='index')
+    if args.id is None and args.exp_name is None:
+        raise ValueError(f'Both id and exp-name attributes cannot be empty')
+
+    engine = create_engine(CONN_STRING, echo=False)
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    results = []
+    individual_evaluations = []
+    if args.id:
+        try:
+            result: Result = session.query(Result).filter(Result.id == args.id).first()
+
+            individual_evaluations = result.individual_evaluations
+
+            results = [result]
+
+        except OperationalError:
+            print(f'No results found with id {args.id}')
+    else:
+        try:
+            results: List[Result] = session.query(Result).filter(Result.name == args.exp_name).all()
+
+            individual_evaluations = pd.concat([result.individual_evaluations for result in results])
+
+        except OperationalError:
+            print(f'No results found with name {args.exp_name}')
+
+    df = individual_evaluations
+    df = df.sample(frac=1 / len(results))
 
     plt.figure()
-    points = plt.scatter(df[args.axis1],
-                         df[args.axis2],
-                         c=df[args.color],
-                         s=1, cmap='viridis', alpha=0.5)
+    x = df[args.axis1].values
+    y = df[args.axis2].values
+    c = df[args.color].values
+    points = plt.scatter(x, y, c=c, s=1, cmap='viridis', alpha=0.5)
     plt.colorbar(points, label=args.color)
 
     sns.regplot(args.axis1, args.axis2, data=df, scatter=False, x_jitter=0.005, y_jitter=0.005, order=1, robust=False)
 
-    if args.output_file:
-        plt.savefig(args.output_file, dpi=600)
-    else:
-        plt.show()
+    plt.show()
+
+    session.close()
+
+    # summary_files = glob.glob(args.input_file + '/dataset_analysis*_metrics.csv')
+    # summary_files.sort(key=os.path.getmtime, reverse=True)
+    # print('Found ' + str(len(summary_files)) + ' files')
+    # summary_files = summary_files[:min(len(summary_files), args.n_last_results)]
+    # print('Processing ' + str(len(summary_files)) + ' files:')
+    # dfs = [pd.read_csv(summary, index_col=0) for summary in summary_files]
+    # df = pd.concat(dfs)
+    # df = df.reset_index().sample(frac=(1 / len(summary_files)))
+    # df['index'] = df['index'].apply(lambda x: round(float(x) / 128))
+    # df = df.sort_values(by='index')
+    #
+    # plt.figure()
+    # points = plt.scatter(df[args.axis1],
+    #                      df[args.axis2],
+    #                      c=df[args.color],
+    #                      s=1, cmap='viridis', alpha=0.5)
+    # plt.colorbar(points, label=args.color)
+    #
+    # sns.regplot(args.axis1, args.axis2, data=df, scatter=False, x_jitter=0.005, y_jitter=0.005, order=1, robust=False)
+    #
+    # if args.output_file:
+    #     plt.savefig(args.output_file, dpi=600)
+    # else:
+    #     plt.show()
 
 
 def melt_results(args):
@@ -235,7 +284,7 @@ def correct_wells_names(well_name):
     return well_name
 
 
-def petrofacies_to_petrel(df, args):
+def petrofacies_to_petrel(df):
     thin_section_names = df.index.values
     wells = map(partial(re.search, '([\w|-]+) [-+]?[0-9]*\.?[0-9]*'), thin_section_names)
     wells = list(map(lambda x: x.group(1), wells))
@@ -251,7 +300,8 @@ def petrofacies_to_petrel(df, args):
         a1 = []
         a2 = []
         for depth, thin_section_name, petrofacie, well_i in zip(depths, thin_section_names, petrofacies, wells):
-            if well_i != well: continue
+            if well_i != well:
+                continue
             a1.append(['%.2f' % depth, '%.2f' % (depth + epsilon), '"' + ('%.2f' % depth) + '"'])
             a2.append(['%.2f' % depth, '%.2f' % (depth + epsilon), '"' + petrofacie + '"'])
         file1 = open(well + '_1.txt', 'w')
@@ -350,24 +400,32 @@ def average_feature_selection(args):
 
 
 def show_results():
-    engine = create_engine('sqlite:///local.db', echo=False)
+    engine = create_engine(CONN_STRING, echo=False)
     Session = sessionmaker(bind=engine)
     session = Session()
 
-    results = session.query(Result).order_by(asc(Result.start_time)).all()
+    try:
+        results = session.query(Result).order_by(asc(Result.start_time)).all()
 
-    for result in results:
-        print(result)
+        for result in results:
+            print(result)
+
+    except OperationalError:
+        print('No results found')
+
     session.close()
 
 
 def show_result(args):
-    engine = create_engine('sqlite:///local.db', echo=False)
+    engine = create_engine(CONN_STRING, echo=False)
     Session = sessionmaker(bind=engine)
     session = Session()
 
-    result = session.query(Result).order_by(desc(Result.start_time)).filter(Result.id == args.id).first()
-    print(result.details())
+    try:
+        result = session.query(Result).order_by(desc(Result.start_time)).filter(Result.id == args.id).first()
+        print(result.details())
+    except AttributeError:
+        print(f'Result {args.id} not found in {DB_NAME}')
 
     session.close()
 
@@ -386,7 +444,7 @@ def main():
         find_useful_features(args)
     elif args.petrel:
         df = pd.read_csv(args.input_file, index_col=0)
-        petrofacies_to_petrel(df, args)
+        petrofacies_to_petrel(df)
     elif args.merge_feature_selection:
         merge_feature_selection(args)
     elif args.clear_incomplete_outputs:
@@ -426,20 +484,6 @@ def class_cluster_match(y_true, y_pred):
 
     References
     ----------
-
-    Examples
-    --------
-    >>> from sklearn.metrics import confusion_matrix
-    >>> from sklearn.metrics.cluster import class_cluster_match
-    >>> y_true = ["class1", "class2", "class3", "class1", "class1", "class3"]
-    >>> y_pred = [0, 0, 2, 2, 0, 2]
-    >>> y_pred_translated = class_cluster_match(y_true, y_pred)
-    >>> y_pred_translated
-    ['class1', 'class1', 'class3', 'class3', 'class1', 'class3']
-    >>> confusion_matrix(y_true, y_pred_translated)
-    array([[2, 0, 1],
-           [1, 0, 0],
-           [0, 0, 2]])
     """
 
     classes = unique_labels(y_true).tolist()

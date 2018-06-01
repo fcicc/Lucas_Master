@@ -17,7 +17,7 @@ from sqlalchemy import create_engine
 from analysis_utils import class_cluster_match
 from ga_clustering import ALLOWED_FITNESSES, GAClustering
 from orm_interface import store_results
-from orm_models import Base
+from orm_models import Base, DB_NAME, CONN_STRING
 
 rpy2.robjects.r['options'](warn=-1)
 
@@ -60,7 +60,7 @@ def argument_parser() -> argparse.Namespace:
 
 
 def run():
-    engine = create_engine('sqlite:///local.db', echo=False)
+    engine = create_engine(CONN_STRING, echo=False)
     Base.metadata.create_all(engine)
 
     args = argument_parser()
@@ -91,7 +91,10 @@ def run():
                       pop_eval_rate=args.eval_rate)
     end_time = datetime.datetime.now()
 
-    ga.fit(dataset_matrix)
+    if args.eval_rate:
+        ga.fit(dataset_matrix, y=y)
+    else:
+        ga.fit(dataset_matrix)
 
     best_features = [col for col, boolean in zip(dataset.columns.values, ga.top_)
                      if boolean]
@@ -116,8 +119,8 @@ def run():
     adj_rand_score = adjusted_rand_score(y, best_prediction)
     silhouette = silhouette_score(dataset[best_features], best_prediction)
 
-    result_id = store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_features, final_n_features, start_time,
-                  end_time, cm, args, best_features, args.experiment_name)
+    result_id = store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_features, final_n_features,
+                              start_time, end_time, cm, args, best_features, args.experiment_name, ga.metrics_)
 
     print(f'Results stored under the ID {result_id}')
 

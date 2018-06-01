@@ -40,6 +40,6 @@ setup(
     license='',
     author='lucas',
     author_email='',
-    description='', requires=['numpy', 'sklearn', 'rpy2', 'deap', 'tqdm', 'scipy', 'peewee', 'pandas', 'seaborn',
-                              'matplotlib', 'R', 'sqlalchemy']
+    description='', requires=['numpy', 'sklearn', 'rpy2', 'deap', 'tqdm', 'scipy', 'pandas', 'seaborn',
+                              'matplotlib', 'sqlalchemy']
 )

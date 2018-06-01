@@ -6,6 +6,8 @@ from random import randint, choice, sample
 from typing import List, Any, Union
 
 import numpy as np
+import pandas as pd
+import rpy2
 import sklearn.base
 from deap import creator, tools, base, algorithms
 from rpy2.robjects import r
@@ -14,6 +16,9 @@ from sklearn.metrics import silhouette_samples, silhouette_score, f1_score, accu
 from tqdm import tqdm
 
 from analysis_utils import class_cluster_match
+
+# rpy2.robjects.numpy2ri.activate()
+
 
 R_ALLOWED_FITNESSES = [('C_index', -1), ('Calinski_Harabasz', 1), ('Davies_Bouldin', -1),
                        ('Dunn', 1), ('Gamma', 1), ('G_plus', 1), ('GDI11', 1), ('GDI12', 1),
@@ -64,12 +69,17 @@ def perfect_eval_features(X, y, ac, individual):
 
 
 def evaluate_rate_metrics(X, y, ac, samples_dist_matrix, individual):
-    """Evaluate individual according multiple metrics and scores."""
+    """Evaluate individual according multiple metrics and scores.
+    :type X: numpy.ndarray
+    """
     prediction = ac.fit(X * individual).labels_
 
     y_prediction = class_cluster_match(y, prediction)
 
-    int_idx = r['unique_criteria'](X, prediction, [fit[0] for fit in R_ALLOWED_FITNESSES])
+    fitness_names = list([fit[0] for fit in R_ALLOWED_FITNESSES])
+    X_R = rpy2.robjects.r.matrix(rpy2.robjects.FloatVector(X.flatten()), nrow=X.shape[0])
+
+    int_idx = r['unique_criteria'](X_R, rpy2.robjects.FloatVector(prediction.tolist()), fitness_names)
     int_idx = [val[0] for val in list(int_idx)]
 
     silhouette = silhouette_score(samples_dist_matrix, prediction, metric='precomputed')
@@ -79,7 +89,7 @@ def evaluate_rate_metrics(X, y, ac, samples_dist_matrix, individual):
     acc = accuracy_score(y, y_prediction)
     complexity = int(np.sum(individual))
 
-    return tuple(int_idx) + (acc, f1, adj_rand, silhouette, min_silhouette, complexity)
+    return list(int_idx) + [acc, f1, adj_rand, silhouette, min_silhouette, complexity]
 
 
 def evaluate(toolbox, offspring):
@@ -140,7 +150,6 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
         toolbox = base.Toolbox()
 
         pool = Pool(cpu_count() - 1)
-
         toolbox.register("map", pool.map)
         toolbox.register("attr_bool", randint, 0, 1)
         toolbox.register(
@@ -171,11 +180,13 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
         if population_rate:
             sample_population = sample(population, population_rate)
             metrics = list(
-                toolbox.map(partial(evaluate_rate_metrics, X, y, self.algorithm, samples_dist_matrix), sample_population))
+                toolbox.map(partial(evaluate_rate_metrics, X, y, self.algorithm, samples_dist_matrix), sample_population)
+            )
+            metrics = [metric + [0] for metric in metrics]
 
         top = []
         feature_selection_rate = []
-        for _ in tqdm(range(self.n_generations)):
+        for gen in tqdm(range(self.n_generations)):
             offspring = algorithms.varOr(population, toolbox, self.pop_size, cxpb=0.2, mutpb=0.8)
             # noinspection PyTypeChecker
             evaluate(toolbox, offspring)
@@ -184,6 +195,7 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
                 sample_offspring = sample(offspring, population_rate)
                 sample_fits = toolbox.map(partial(evaluate_rate_metrics, X, y, self.algorithm, samples_dist_matrix),
                                           sample_offspring)
+                sample_fits = [metric + [gen] for metric in sample_fits]
                 metrics += sample_fits
 
             if not top:
@@ -194,6 +206,15 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
             population = toolbox.select(offspring + population, k=len(population))
 
             feature_selection_rate.append(list(map(lambda x: x / len(population), np.sum(population, axis=0))))
+
+        metrics_names = ['C_index', 'Calinski_Harabasz',
+                          'Davies_Bouldin', 'Dunn', 'Gamma', 'G_plus', 'GDI11', 'GDI12', 'GDI13', 'GDI21',
+                          'GDI22', 'GDI23', 'GDI31', 'GDI32', 'GDI33', 'GDI41', 'GDI42', 'GDI43', 'GDI51',
+                          'GDI52', 'GDI53', 'McClain_Rao', 'PBM', 'Point_Biserial', 'Ray_Turi',
+                          'Ratkowsky_Lance', 'SD_Scat', 'SD_Dis', 'Silhouette',  'Tau', 'Wemmert_Gancarski']
+        metrics_names += ['accuracy', 'f1_score', 'adjusted_rand_score', 'silhouette_sklearn', 'min_silhouette_sklearn',
+                          'complexity']
+        metrics = pd.DataFrame(metrics, columns=metrics_names+['generation'])
 
         self.top_ = top[0]
         self.metrics_ = metrics
