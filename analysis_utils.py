@@ -1,17 +1,15 @@
-import sys
-from typing import List
-
-import pandas as pd
-import seaborn as sns
-import numpy as np
-import matplotlib.pyplot as plt
-import os
-import csv
 import argparse
+import csv
 import glob
+import os
 import re
 from functools import partial
+from typing import List
 
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 from sklearn.metrics.cluster import contingency_matrix
 from sklearn.utils.linear_assignment_ import linear_assignment
 from sklearn.utils.multiclass import unique_labels
@@ -34,15 +32,12 @@ def argument_parser() -> argparse.Namespace:
     parser.add_argument('--color', type=str, help='''point color''', default='generation')
     parser.add_argument('-c', '--correlation', action='store_true', help='generates correlation matrix')
     parser.add_argument('-m', '--merge-results', action='store_true', help='')
-    parser.add_argument('-a', '--merge-feature-selection', action='store_true', help='')
     parser.add_argument('-n', '--n-last-results', type=int, help='', default=10)
     parser.add_argument('-t', '--petrel', action='store_true', help='')
     parser.add_argument('-u', '--useful-features', action='store_true', help='')
     parser.add_argument('-b', '--clear-incomplete-outputs', action='store_true', help='')
     parser.add_argument('-e', '--melt-results', action='store_true', help='')
     parser.add_argument('-d', '--average-feature-selection', action='store_true', help='')
-    parser.add_argument('-j', '--n-by-k-scores', action='store_true')
-    parser.add_argument('-k', '--number-of-trials', type=int, help='', default=5)
     parser.add_argument('-s', '--list-results', action='store_true')
     parser.add_argument('-r', '--list-result', action='store_true')
     parser.add_argument('--id', type=int, default=None)
@@ -52,87 +47,12 @@ def argument_parser() -> argparse.Namespace:
 
     if sum([args.plot_correlation, args.correlation,
             args.merge_results, args.petrel,
-            args.useful_features, args.merge_feature_selection,
-            args.clear_incomplete_outputs, args.melt_results,
-            args.average_feature_selection, args.n_by_k_scores,
-            args.list_results, args.list_result]) != 1:
+            args.useful_features, args.melt_results,
+            args.average_feature_selection, args.list_results,
+            args.list_result]) != 1:
         raise ValueError("Cannot have this combination of arguments.")
 
     return args
-
-
-def read_final_score(path):
-    f = open(path)
-
-    float_re = '[-+]?[0-9]*\.?[0-9]*'
-    df = {}
-    while True:
-        line = f.readline().strip().lower()
-        if line == 'summary:':
-            result_lines = [f.readline().strip().lower() for _ in range(8)]
-            df['accuracy'] = re.search('accuracy score\s+({0})'.format(float_re), result_lines[0]).group(1)
-            df['ari'] = re.search('adjusted rand score\s+({0})'.format(float_re), result_lines[1]).group(1)
-            df['ch'] = re.search('calinski harabaz score\s+({0})'.format(float_re), result_lines[2]).group(1)
-            df['fmeasure'] = re.search('f1 score\s+({0})'.format(float_re), result_lines[3]).group(1)
-            df['final_features'] = re.search('final number of features\s+({0})'.format(float_re),
-                                             result_lines[5]).group(1)
-            df['initial_features'] = re.search('initial number of features\s+({0})'.format(float_re),
-                                               result_lines[6]).group(1)
-            df['silhouette'] = re.search('silhouette score\s+({0})'.format(float_re), result_lines[7]).group(1)
-            break
-
-    f.close()
-
-    for key, val in df.items():
-        df[key] = [float(df[key])]
-
-    return pd.DataFrame.from_dict(df)
-
-
-def n_by_k_results(args):
-    summary_files = glob.glob(args.input_file + '/dataset_analysis*.txt')
-    summary_files.sort(key=os.path.getmtime, reverse=True)
-    n = args.n_last_results
-    k = args.number_of_trials
-    print('Found ' + str(len(summary_files)) + ' files')
-    summary_files = summary_files[:min(len(summary_files), n * k)]
-    print('Processing ' + str(len(summary_files)) + ' files')
-
-    scores = []
-    for i in range(n):
-        df = pd.concat([read_final_score(path) for path in summary_files[i * k:i * k + k]])
-        df['trial'] = pd.Series([n - i] * df.shape[0])
-        scores.append(df)
-
-    scores = pd.concat(scores)
-
-    # scores.boxplot(by='trial', column=['accuracy', 'ari', 'fmeasure', 'silhouette'], layout=(4,1))
-    box_keys = []
-    box_data = {'final_features': [],
-                'accuracy': [],
-                'fmeasure': [],
-                'silhouette': []}
-    for key, grp in scores.groupby('trial'):
-        box_keys.append(int(key) * 5)
-        box_data['final_features'].append(grp['final_features'].mean())
-        box_data['accuracy'].append(grp['accuracy'].mean())
-        box_data['fmeasure'].append(grp['fmeasure'].mean())
-        box_data['silhouette'].append(grp['silhouette'].mean())
-
-    fig, ax1 = plt.subplots()
-
-    ax1.plot(box_data['final_features'])
-
-    ax2 = ax1.twinx()
-    ax2.plot(box_data['accuracy'], label='accuracy')
-    ax2.plot(box_data['fmeasure'], label='fmeasure')
-    ax2.plot(box_data['silhouette'], label='silhouette')
-
-    plt.legend()
-    if args.output_file:
-        plt.savefig(args.output_file, dpi=600)
-    else:
-        plt.show()
 
 
 def plot_correlation(args):
@@ -143,15 +63,12 @@ def plot_correlation(args):
     Session = sessionmaker(bind=engine)
     session = Session()
 
-    results = []
     individual_evaluations = []
     if args.id:
         try:
             result: Result = session.query(Result).filter(Result.id == args.id).first()
 
             individual_evaluations = result.individual_evaluations
-
-            results = [result]
 
         except OperationalError:
             print(f'No results found with id {args.id}')
@@ -165,7 +82,7 @@ def plot_correlation(args):
             print(f'No results found with name {args.exp_name}')
 
     df = individual_evaluations
-    df = df.sample(frac=1 / len(results))
+    # df = df.sample(frac=1 / len(results))
 
     plt.figure()
     x = df[args.axis1].values
@@ -179,31 +96,6 @@ def plot_correlation(args):
     plt.show()
 
     session.close()
-
-    # summary_files = glob.glob(args.input_file + '/dataset_analysis*_metrics.csv')
-    # summary_files.sort(key=os.path.getmtime, reverse=True)
-    # print('Found ' + str(len(summary_files)) + ' files')
-    # summary_files = summary_files[:min(len(summary_files), args.n_last_results)]
-    # print('Processing ' + str(len(summary_files)) + ' files:')
-    # dfs = [pd.read_csv(summary, index_col=0) for summary in summary_files]
-    # df = pd.concat(dfs)
-    # df = df.reset_index().sample(frac=(1 / len(summary_files)))
-    # df['index'] = df['index'].apply(lambda x: round(float(x) / 128))
-    # df = df.sort_values(by='index')
-    #
-    # plt.figure()
-    # points = plt.scatter(df[args.axis1],
-    #                      df[args.axis2],
-    #                      c=df[args.color],
-    #                      s=1, cmap='viridis', alpha=0.5)
-    # plt.colorbar(points, label=args.color)
-    #
-    # sns.regplot(args.axis1, args.axis2, data=df, scatter=False, x_jitter=0.005, y_jitter=0.005, order=1, robust=False)
-    #
-    # if args.output_file:
-    #     plt.savefig(args.output_file, dpi=600)
-    # else:
-    #     plt.show()
 
 
 def melt_results(args):
@@ -245,17 +137,17 @@ def correlation_calculation(df, args):
 
 
 def merge_results(args):
-    summary_files = glob.glob(args.input_file + '/dataset_analysis*.txt')
-    summary_files.sort(key=os.path.getmtime, reverse=True)
-    print('Found ' + str(len(summary_files)) + ' files')
-    summary_files = summary_files[:min(len(summary_files), args.n_last_results)]
-    print('Processing ' + str(len(summary_files)) + ' files:')
+    engine = create_engine(CONN_STRING, echo=False)
+    Session = sessionmaker(bind=engine)
+    session = Session()
 
-    scores = []
-    for path in summary_files:
-        scores.append(read_final_score(path))
+    results: List[Result] = session.query(Result).filter(Result.name == args.exp_name).all()
 
-    all_results = pd.concat(scores)
+    all_results = [[result.accuracy, result.f_measure, result.silhouette] for result in results]
+    all_results = pd.DataFrame(all_results, columns=['accuracy', 'f_measure', 'silhouette'])
+    all_results = pd.concat([all_results, all_results.describe()])
+
+    session.close()
 
     if args.output_file:
         all_results.to_csv(args.output_file, quoting=csv.QUOTE_NONNUMERIC, float_format='%.10f', index=True)
@@ -341,62 +233,17 @@ def find_useful_features(args):
         print(df)
 
 
-def merge_feature_selection(args):
-    summary_files = glob.glob(args.input_file + '/dataset_analysis*_selection_rate.csv')
-    summary_files.sort(key=os.path.getmtime, reverse=True)
-    print('Found ' + str(len(summary_files)) + ' files')
-    summary_files = summary_files[:min(len(summary_files), args.n_last_results)]
-    print('Processing ' + str(len(summary_files)) + ' files:')
-
-    dfs = list(map(partial(pd.read_csv, index_col=0), summary_files))
-
-    results_df = pd.concat(list(map(lambda df: df[['199']], dfs)), axis=1)
-    results_df.columns = ['trial ' + str(i) for i in range(results_df.shape[1])]
-    results_df['average'] = results_df.mean(axis=1)
-    results_df = results_df.sort_values(by='average', ascending=False)
-
-    if args.output_file:
-        results_df.to_csv(args.output_file, quoting=csv.QUOTE_NONNUMERIC, float_format='%.10f', index=True)
-    else:
-        print(results_df)
-
-
-def clear_incomplete_experiments(args):
-    """Search the input directory for incomplete run files and erase them."""
-    results_regex = os.path.join(args.input_file,
-                                 "dataset_analysis{0},{1}_{2}_{3}-{4}_{5}_{6}.txt".format(('[0-9a-fA-F]' * 7),
-                                                                                          ('[0-9]' * 4), (
-                                                                                                  '[0-9]' * 2),
-                                                                                          ('[0-9]' * 2), ('[0-9]' * 2),
-                                                                                          ('[0-9]' * 2), ('[0-9]' * 2)))
-    summary_files = glob.glob(results_regex)
-
-    for summary_file in summary_files:
-        summary_file_name = os.path.basename(summary_file)
-        file_id = re.search(
-            "dataset_analysis({0},{1}_{2}_{3}-{4}_{5}_{6}).txt".format(('[0-9a-fA-F]' * 7), ('[0-9]' * 4), (
-                    '[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2), ('[0-9]' * 2)),
-            summary_file_name).group(1)
-        related_files = glob.glob(args.input_file + '/*{0}*'.format(file_id))
-        if len(related_files) < 4:
-            print('Erasing files from execution {0}'.format(file_id))
-            for file_path in related_files:
-                os.remove(file_path)
-
-    print('Done!')
-
-
 def average_feature_selection(args):
-    summary_files = glob.glob(args.input_file + '/dataset_analysis*_filtered_dataset.csv')
-    summary_files.sort(key=os.path.getmtime, reverse=True)
-    print('Found ' + str(len(summary_files)) + ' files')
-    summary_files = summary_files[:min(len(summary_files), args.n_last_results)]
-    print('Processing ' + str(len(summary_files)) + ' files:')
+    engine = create_engine(CONN_STRING, echo=False)
+    Session = sessionmaker(bind=engine)
+    session = Session()
 
-    dfs = list(map(partial(pd.read_csv, index_col=0), summary_files))
-    avg_n_features = np.average([df.shape[1] for df in dfs])
+    results: List[Result] = session.query(Result).filter(Result.name == args.exp_name).all()
+    avg_n_features = np.mean([result.final_n_features for result in results])
 
-    print('Average number of features: {0}'.format(avg_n_features))
+    print(f'Average number of features: {avg_n_features}')
+
+    session.close()
 
 
 def show_results():
@@ -445,16 +292,10 @@ def main():
     elif args.petrel:
         df = pd.read_csv(args.input_file, index_col=0)
         petrofacies_to_petrel(df)
-    elif args.merge_feature_selection:
-        merge_feature_selection(args)
-    elif args.clear_incomplete_outputs:
-        clear_incomplete_experiments(args)
     elif args.melt_results:
         melt_results(args)
     elif args.average_feature_selection:
         average_feature_selection(args)
-    elif args.n_by_k_scores:
-        n_by_k_results(args)
     elif args.list_results:
         show_results()
     elif args.list_result:
