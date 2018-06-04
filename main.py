@@ -1,10 +1,14 @@
 import argparse
 import datetime
-
 import warnings
+
 from rpy2.rinterface import RRuntimeWarning
 
+from orm_models import create_if_not_exists
+
 warnings.filterwarnings("ignore", category=RRuntimeWarning)
+
+from pso_clustering import PSOClustering
 
 import pandas as pd
 import rpy2
@@ -12,12 +16,10 @@ from sklearn import cluster
 from sklearn.metrics import confusion_matrix, silhouette_score, adjusted_rand_score, \
     accuracy_score, f1_score
 from sklearn.utils.multiclass import unique_labels
-from sqlalchemy import create_engine
 
 from analysis_utils import class_cluster_match
 from ga_clustering import ALLOWED_FITNESSES, GAClustering
 from orm_interface import store_results
-from orm_models import Base, DB_NAME, CONN_STRING
 
 rpy2.robjects.r['options'](warn=-1)
 
@@ -50,6 +52,10 @@ def argument_parser() -> argparse.Namespace:
                         help='cluster algorithm to be used')
     parser.add_argument('-d', '--dont-use-ga', action='store_true',
                         help='disables the use of GA and apply cluster to all dimensions')
+    parser.add_argument('-f', '--db-file', type=str, default='./local.db',
+                        help='sqlite file to store results')
+    parser.add_argument('-s', '--strategy', type=str, default='ga',
+                        help='ga(Genetic Algorithm) or PSO (Particle Swarm Optimization)')
 
     args = parser.parse_args()
 
@@ -60,10 +66,9 @@ def argument_parser() -> argparse.Namespace:
 
 
 def run():
-    engine = create_engine(CONN_STRING, echo=False)
-    Base.metadata.create_all(engine)
-
     args = argument_parser()
+
+    create_if_not_exists(args.db_file)
 
     df = pd.read_csv(args.input_file, index_col=0, header=0)
 
@@ -85,18 +90,25 @@ def run():
     if len(unique_labels(y)) > args.min_features:
         args.min_features = len(unique_labels(y))
 
+    strategy_clustering = None
+    if args.strategy == 'ga':
+        strategy_clustering = GAClustering(algorithm=ac, n_generations=args.num_gen, perfect=args.perfect,
+                                           min_features=args.min_features, max_features=args.max_features,
+                                           fitness_metric=args.fitness_metric, pop_size=args.pop_size,
+                                           pop_eval_rate=args.eval_rate)
+    elif args.strategy == 'pso':
+        strategy_clustering = PSOClustering(algorithm=ac, n_generations=args.num_gen, perfect=args.perfect,
+                                            fitness_metric=args.fitness_metric, pop_size=args.pop_size,
+                                            pop_eval_rate=args.eval_rate)
+
     start_time = datetime.datetime.now()
-    ga = GAClustering(algorithm=ac, n_generations=args.num_gen, perfect=args.perfect, min_features=args.min_features,
-                      max_features=args.max_features, fitness_metric=args.fitness_metric, pop_size=args.pop_size,
-                      pop_eval_rate=args.eval_rate)
+    if args.eval_rate:
+        strategy_clustering.fit(dataset_matrix, y=y)
+    else:
+        strategy_clustering.fit(dataset_matrix)
     end_time = datetime.datetime.now()
 
-    if args.eval_rate:
-        ga.fit(dataset_matrix, y=y)
-    else:
-        ga.fit(dataset_matrix)
-
-    best_features = [col for col, boolean in zip(dataset.columns.values, ga.top_)
+    best_features = [col for col, boolean in zip(dataset.columns.values, strategy_clustering.global_best_)
                      if boolean]
     best_prediction = ac.fit(dataset[best_features]).labels_
 
@@ -120,7 +132,8 @@ def run():
     silhouette = silhouette_score(dataset[best_features], best_prediction)
 
     result_id = store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_features, final_n_features,
-                              start_time, end_time, cm, args, best_features, args.experiment_name, ga.metrics_)
+                              start_time, end_time, cm, args, best_features, args.experiment_name,
+                              strategy_clustering.metrics_, args.db_file)
 
     print(f'Results stored under the ID {result_id}')
 

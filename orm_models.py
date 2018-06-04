@@ -3,15 +3,29 @@ from typing import List
 
 import numpy as np
 import pandas as pd
-from sqlalchemy import Column, Integer, DateTime, Float, ForeignKey, String, PickleType
+from sqlalchemy import Column, Integer, DateTime, Float, ForeignKey, String, PickleType, create_engine
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, sessionmaker
 
-DB_NAME = 'local.db'
-# CONN_STRING = f'sqlite+pysqlcipher://{DB_NAME}'''
-CONN_STRING = f'sqlite:///{DB_NAME}'''
-# PASSWORD = open('./pass.txt', 'r').read()
-# CONN_STRING = f'mysql+pymysql://root:{PASSWORD}@localhost/mestrado'
+
+def get_conn_string(db_file):
+    return f'sqlite:///{db_file}'
+
+
+def local_create_engine(db_file):
+    return create_engine(get_conn_string(db_file), echo=False)
+
+
+def create_if_not_exists(db_file):
+    engine = local_create_engine(db_file)
+    Base.metadata.create_all(engine)
+
+
+def local_create_session(db_file):
+    engine = local_create_engine(db_file)
+    Session = sessionmaker(bind=engine)
+    session = Session()
+    return session
 
 
 class Base(object):
@@ -45,7 +59,7 @@ class ConfusionMatrix(Base):
     confusion_matrix_labels = relationship("ConfusionMatrixLabel", back_populates="confusion_matrix")
     confusion_matrix_numbers = relationship("ConfusionMatrixNumber", back_populates="confusion_matrix")
 
-    def __str__(self):
+    def as_dataframe(self) -> pd.DataFrame:
         labels = sorted(self.confusion_matrix_labels, key=lambda x: x.row_column)
         labels = [label.label for label in labels]
 
@@ -54,7 +68,11 @@ class ConfusionMatrix(Base):
         for number in self.confusion_matrix_numbers:
             matrix[number.row, number.column] = number.value
         df = pd.DataFrame(matrix, columns=labels, index=labels)
-        return df.to_string()
+
+        return df
+
+    def __str__(self):
+        return self.as_dataframe().to_string()
 
 
 class ConfusionMatrixLabel(Base):

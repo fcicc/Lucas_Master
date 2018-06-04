@@ -1,15 +1,12 @@
-from pandas import Series
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
 from orm_models import Result, ConfusionMatrix, ConfusionMatrixNumber, ConfusionMatrixLabel, SelectedFeature, Arg, \
-    CONN_STRING
+    local_create_session
 
 
 def store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_features, final_n_features, start_time,
-                  end_time, confusion_matrix, args, selected_columns, result_name, ga_metrics):
+                  end_time, confusion_matrix, args, selected_columns, result_name, ga_metrics, db_file):
     """
 
+    :type db_file: str
     :type ga_metrics: pandas.DataFrame
     :type args: argparse.Namespace
     :type final_n_features: int
@@ -25,9 +22,7 @@ def store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_fea
     :type confusion_matrix: pandas.DataFrame
     """
 
-    engine = create_engine(CONN_STRING)
-    Session = sessionmaker(bind=engine)
-    session = Session()
+    session = local_create_session(db_file)
 
     result_entry = Result(
         name=result_name,

@@ -13,18 +13,17 @@ import seaborn as sns
 from sklearn.metrics.cluster import contingency_matrix
 from sklearn.utils.linear_assignment_ import linear_assignment
 from sklearn.utils.multiclass import unique_labels
-from sqlalchemy import create_engine, desc, asc
+from sqlalchemy import asc
 from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import sessionmaker
 
-from orm_models import Result, DB_NAME, CONN_STRING
+from orm_models import Result, local_create_session
 
 
 def argument_parser() -> argparse.Namespace:
     """Parse input arguments."""
     parser = argparse.ArgumentParser(
         description='''Analysis over input data''')
-    parser.add_argument('--input_file', type=str, help='''input CSV file''', default=None)
+    parser.add_argument('--input-file', type=str, help='''input CSV file''', default=None)
     parser.add_argument('-o', '--output_file', type=str, help='''output file''')
     parser.add_argument('-p', '--plot-correlation', action='store_true', help='plot correlation')
     parser.add_argument('--axis1', type=str, help='''first plot axis''', default='silhouette_sklearn')
@@ -40,8 +39,11 @@ def argument_parser() -> argparse.Namespace:
     parser.add_argument('-d', '--average-feature-selection', action='store_true', help='')
     parser.add_argument('-s', '--list-results', action='store_true')
     parser.add_argument('-r', '--list-result', action='store_true')
+    parser.add_argument('-k', '--confusion-matrix', action='store_true')
+    parser.add_argument('-f', '--filter', action='store_true')
     parser.add_argument('--id', type=int, default=None)
     parser.add_argument('--exp-name', type=str, default=None)
+    parser.add_argument('--db-file', type=str, default='./local.db', help='sqlite file to store results')
 
     args = parser.parse_args()
 
@@ -49,26 +51,61 @@ def argument_parser() -> argparse.Namespace:
             args.merge_results, args.petrel,
             args.useful_features, args.melt_results,
             args.average_feature_selection, args.list_results,
-            args.list_result]) != 1:
+            args.list_result, args.confusion_matrix,
+            args.filter]) != 1:
         raise ValueError("Cannot have this combination of arguments.")
 
     return args
+
+
+def confusion_matrix(args):
+    if args.id is None and args.exp_name is None:
+        raise ValueError(f'Both id and exp-name attributes cannot be empty')
+
+    session = local_create_session(args.db_file)
+
+    cm = []
+    if args.id:
+        try:
+            result: Result = session.query(Result).filter(Result.id == args.id).first()
+
+            cm = result.confusion_matrix.as_dataframe()
+
+        except OperationalError:
+            print(f'No results found with id {args.id}')
+    else:
+        try:
+            results: List[Result] = session.query(Result).filter(Result.name == args.exp_name).all()
+
+            cm = sum([result.confusion_matrix.as_dataframe() for result in results])
+
+        except OperationalError:
+            print(f'No results found with name {args.exp_name}')
+
+    if args.output_file:
+        cm.to_csv(args.output_file, quoting=csv.QUOTE_NONNUMERIC, float_format='%.10f', index=True)
+    else:
+        with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+            print(cm)
+
+    session.close()
 
 
 def plot_correlation(args):
     if args.id is None and args.exp_name is None:
         raise ValueError(f'Both id and exp-name attributes cannot be empty')
 
-    engine = create_engine(CONN_STRING, echo=False)
-    Session = sessionmaker(bind=engine)
-    session = Session()
+    session = local_create_session(args.db_file)
 
     individual_evaluations = []
+    results = []
     if args.id:
         try:
             result: Result = session.query(Result).filter(Result.id == args.id).first()
 
             individual_evaluations = result.individual_evaluations
+
+            results = [result]
 
         except OperationalError:
             print(f'No results found with id {args.id}')
@@ -137,9 +174,7 @@ def correlation_calculation(df, args):
 
 
 def merge_results(args):
-    engine = create_engine(CONN_STRING, echo=False)
-    Session = sessionmaker(bind=engine)
-    session = Session()
+    session = local_create_session(args.db_file)
 
     results: List[Result] = session.query(Result).filter(Result.name == args.exp_name).all()
 
@@ -234,9 +269,7 @@ def find_useful_features(args):
 
 
 def average_feature_selection(args):
-    engine = create_engine(CONN_STRING, echo=False)
-    Session = sessionmaker(bind=engine)
-    session = Session()
+    session = local_create_session(args.db_file)
 
     results: List[Result] = session.query(Result).filter(Result.name == args.exp_name).all()
     avg_n_features = np.mean([result.final_n_features for result in results])
@@ -246,10 +279,8 @@ def average_feature_selection(args):
     session.close()
 
 
-def show_results():
-    engine = create_engine(CONN_STRING, echo=False)
-    Session = sessionmaker(bind=engine)
-    session = Session()
+def show_results(args):
+    session = local_create_session(args.db_file)
 
     try:
         results = session.query(Result).order_by(asc(Result.start_time)).all()
@@ -264,17 +295,37 @@ def show_results():
 
 
 def show_result(args):
-    engine = create_engine(CONN_STRING, echo=False)
-    Session = sessionmaker(bind=engine)
-    session = Session()
+    session = local_create_session(args.db_file)
 
     try:
-        result = session.query(Result).order_by(desc(Result.start_time)).filter(Result.id == args.id).first()
+        result = session.query(Result).filter(Result.id == args.id).first()
         print(result.details())
     except AttributeError:
-        print(f'Result {args.id} not found in {DB_NAME}')
+        print(f'Result {args.id} not found in {args.db_file}')
 
     session.close()
+
+
+def filter_dataset(args):
+    df: pd.DataFrame = pd.read_csv(args.input_file, index_col=0)
+
+    session = local_create_session(args.db_file)
+
+    columns = []
+    try:
+        result = session.query(Result).filter(Result.id == args.id).first()
+        columns = [selected_feature.column for selected_feature in result.selected_features]
+    except AttributeError:
+        print(f'Result {args.id} not found in {args.db_file}')
+
+    session.close()
+
+    df = df.filter(items=columns+['petrofacie'])
+
+    if args.output_file:
+        df.to_csv(args.output_file, quoting=csv.QUOTE_NONNUMERIC, float_format='%.10f', index=True)
+    else:
+        print(df)
 
 
 def main():
@@ -297,9 +348,13 @@ def main():
     elif args.average_feature_selection:
         average_feature_selection(args)
     elif args.list_results:
-        show_results()
+        show_results(args)
     elif args.list_result:
         show_result(args)
+    elif args.confusion_matrix:
+        confusion_matrix(args)
+    elif args.filter:
+        filter_dataset(args)
 
 
 def class_cluster_match(y_true, y_pred):
