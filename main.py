@@ -17,7 +17,7 @@ from sklearn.metrics import confusion_matrix, silhouette_score, adjusted_rand_sc
     accuracy_score, f1_score
 from sklearn.utils.multiclass import unique_labels
 
-from analysis_utils import class_cluster_match
+from analysis_utils import class_cluster_match, plot_correlation
 from ga_clustering import ALLOWED_FITNESSES, GAClustering
 from orm_interface import store_results
 
@@ -52,10 +52,12 @@ def argument_parser() -> argparse.Namespace:
                         help='cluster algorithm to be used')
     parser.add_argument('-d', '--dont-use-ga', action='store_true',
                         help='disables the use of GA and apply cluster to all dimensions')
-    parser.add_argument('-f', '--db-file', type=str, default='./local.db',
+    parser.add_argument('-o', '--db-file', type=str, default='./local.db',
                         help='sqlite file to store results')
     parser.add_argument('-s', '--strategy', type=str, default='ga',
                         help='ga(Genetic Algorithm) or PSO (Particle Swarm Optimization)')
+    parser.add_argument('-k', '--show_results', action='store_true',
+                        help='enables showing result')
 
     args = parser.parse_args()
 
@@ -134,6 +136,9 @@ def run():
     result_id = store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_features, final_n_features,
                               start_time, end_time, cm, args, best_features, args.experiment_name,
                               strategy_clustering.metrics_, args.db_file)
+
+    if args.show_results:
+        plot_correlation(args.db_file, 'silhouette_sklearn', 'adjusted_rand_score', 'generation', id=result_id)
 
     print(f'Results stored under the ID {result_id}')
 

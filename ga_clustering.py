@@ -1,4 +1,5 @@
 import math
+from copy import deepcopy
 from functools import partial
 from multiprocessing import cpu_count
 from multiprocessing.pool import Pool
@@ -87,9 +88,8 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
         metrics = []
         global_best = None
         feature_selection_rate = []
+        evaluate(toolbox, population)
         for gen in tqdm(range(self.n_generations)):
-            evaluate(toolbox, population)
-
             if population_rate:
                 sample_offspring = sample(population, population_rate)
                 sample_fits = toolbox.map(evaluate_rate_function, sample_offspring)
@@ -97,11 +97,12 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
                 metrics += sample_fits
 
             offspring = algorithms.varOr(population, toolbox, self.pop_size, cxpb=0.2, mutpb=0.8)
+            evaluate(toolbox, offspring)
 
             if global_best is None:
-                global_best = tools.selBest(offspring + population, k=1)[0]
+                global_best = deepcopy(tools.selBest(offspring + population, k=1)[0])
             else:
-                global_best = tools.selBest(offspring + global_best, k=1)[0]
+                global_best = deepcopy(tools.selBest(offspring + [global_best], k=1)[0])
 
             population = toolbox.select(offspring + population, k=len(population))
 

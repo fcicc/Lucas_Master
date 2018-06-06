@@ -91,44 +91,41 @@ def confusion_matrix(args):
     session.close()
 
 
-def plot_correlation(args):
-    if args.id is None and args.exp_name is None:
+def plot_correlation(db_file, axis1, axis2, color, id=None, exp_name=None):
+    if id is None and exp_name is None:
         raise ValueError(f'Both id and exp-name attributes cannot be empty')
 
-    session = local_create_session(args.db_file)
+    session = local_create_session(db_file)
 
     individual_evaluations = []
-    results = []
-    if args.id:
+    if id:
         try:
-            result: Result = session.query(Result).filter(Result.id == args.id).first()
+            result: Result = session.query(Result).filter(Result.id == id).first()
 
             individual_evaluations = result.individual_evaluations
 
-            results = [result]
-
         except OperationalError:
-            print(f'No results found with id {args.id}')
+            print(f'No results found with id {id}')
     else:
         try:
-            results: List[Result] = session.query(Result).filter(Result.name == args.exp_name).all()
+            results: List[Result] = session.query(Result).filter(Result.name == exp_name).all()
 
             individual_evaluations = pd.concat([result.individual_evaluations for result in results])
 
         except OperationalError:
-            print(f'No results found with name {args.exp_name}')
+            print(f'No results found with name {exp_name}')
 
     df = individual_evaluations
     # df = df.sample(frac=1 / len(results))
 
     plt.figure()
-    x = df[args.axis1].values
-    y = df[args.axis2].values
-    c = df[args.color].values
+    x = df[axis1].values
+    y = df[axis2].values
+    c = df[color].values
     points = plt.scatter(x, y, c=c, s=1, cmap='viridis', alpha=0.5)
-    plt.colorbar(points, label=args.color)
+    plt.colorbar(points, label=color)
 
-    sns.regplot(args.axis1, args.axis2, data=df, scatter=False, x_jitter=0.005, y_jitter=0.005, order=1, robust=False)
+    sns.regplot(axis1, axis2, data=df, scatter=False, x_jitter=0.005, y_jitter=0.005, order=1, robust=False)
 
     plt.show()
 
@@ -332,7 +329,7 @@ def main():
     args = argument_parser()
 
     if args.plot_correlation:
-        plot_correlation(args)
+        plot_correlation(args.db_file, args.axis1, args.axis2, args.color, id=args.id, exp_name=args.exp_name)
     elif args.correlation:
         df = pd.read_csv(args.input_file, index_col=0)
         correlation_calculation(df, args)
