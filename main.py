@@ -56,8 +56,10 @@ def argument_parser() -> argparse.Namespace:
                         help='sqlite file to store results')
     parser.add_argument('-s', '--strategy', type=str, default='ga',
                         help='ga(Genetic Algorithm) or PSO (Particle Swarm Optimization)')
-    parser.add_argument('-k', '--show_results', action='store_true',
+    parser.add_argument('-k', '--show-results', action='store_true',
                         help='enables showing result')
+    parser.add_argument('-n', '--run-multiple', type=int, default=1,
+                        help='number of multiple runs')
 
     args = parser.parse_args()
 
@@ -92,55 +94,56 @@ def run():
     if len(unique_labels(y)) > args.min_features:
         args.min_features = len(unique_labels(y))
 
-    strategy_clustering = None
-    if args.strategy == 'ga':
-        strategy_clustering = GAClustering(algorithm=ac, n_generations=args.num_gen, perfect=args.perfect,
-                                           min_features=args.min_features, max_features=args.max_features,
-                                           fitness_metric=args.fitness_metric, pop_size=args.pop_size,
-                                           pop_eval_rate=args.eval_rate)
-    elif args.strategy == 'pso':
-        strategy_clustering = PSOClustering(algorithm=ac, n_generations=args.num_gen, perfect=args.perfect,
-                                            fitness_metric=args.fitness_metric, pop_size=args.pop_size,
-                                            pop_eval_rate=args.eval_rate)
+    for _ in range(args.run_multiple):
+        strategy_clustering = None
+        if args.strategy == 'ga':
+            strategy_clustering = GAClustering(algorithm=ac, n_generations=args.num_gen, perfect=args.perfect,
+                                               min_features=args.min_features, max_features=args.max_features,
+                                               fitness_metric=args.fitness_metric, pop_size=args.pop_size,
+                                               pop_eval_rate=args.eval_rate)
+        elif args.strategy == 'pso':
+            strategy_clustering = PSOClustering(algorithm=ac, n_generations=args.num_gen, perfect=args.perfect,
+                                                fitness_metric=args.fitness_metric, pop_size=args.pop_size,
+                                                pop_eval_rate=args.eval_rate)
 
-    start_time = datetime.datetime.now()
-    if args.eval_rate:
-        strategy_clustering.fit(dataset_matrix, y=y)
-    else:
-        strategy_clustering.fit(dataset_matrix)
-    end_time = datetime.datetime.now()
+        start_time = datetime.datetime.now()
+        if args.eval_rate:
+            strategy_clustering.fit(dataset_matrix, y=y)
+        else:
+            strategy_clustering.fit(dataset_matrix)
+        end_time = datetime.datetime.now()
 
-    best_features = [col for col, boolean in zip(dataset.columns.values, strategy_clustering.global_best_)
-                     if boolean]
-    best_prediction = ac.fit(dataset[best_features]).labels_
+        best_features = [col for col, boolean in zip(dataset.columns.values, strategy_clustering.global_best_)
+                         if boolean]
+        best_prediction = ac.fit(dataset[best_features]).labels_
 
-    std_variances = dataset.std(axis=0)
+        std_variances = dataset.std(axis=0)
 
-    result = {
-        feature: std_variance for feature, std_variance in zip(best_features, std_variances)}
-    result = pd.DataFrame.from_dict(result, orient='index')
-    result.columns = ['std']
-    initial_n_features = dataset_matrix.shape[1]
-    final_n_features = len(best_features)
+        result = {
+            feature: std_variance for feature, std_variance in zip(best_features, std_variances)}
+        result = pd.DataFrame.from_dict(result, orient='index')
+        result.columns = ['std']
+        initial_n_features = dataset_matrix.shape[1]
+        final_n_features = len(best_features)
 
-    y_prediction = class_cluster_match(y, best_prediction)
-    cm = confusion_matrix(y, y_prediction)
-    cm = pd.DataFrame(data=cm, index=unique_labels(y),
-                      columns=unique_labels(best_prediction))
+        y_prediction = class_cluster_match(y, best_prediction)
+        cm = confusion_matrix(y, y_prediction)
+        cm = pd.DataFrame(data=cm, index=unique_labels(y),
+                          columns=unique_labels(best_prediction))
 
-    accuracy = accuracy_score(y, y_prediction)
-    f_measure = f1_score(y, y_prediction, average='weighted')
-    adj_rand_score = adjusted_rand_score(y, best_prediction)
-    silhouette = silhouette_score(dataset[best_features], best_prediction)
+        accuracy = accuracy_score(y, y_prediction)
+        f_measure = f1_score(y, y_prediction, average='weighted')
+        adj_rand_score = adjusted_rand_score(y, best_prediction)
+        silhouette = silhouette_score(dataset[best_features], best_prediction)
 
-    result_id = store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_features, final_n_features,
-                              start_time, end_time, cm, args, best_features, args.experiment_name,
-                              strategy_clustering.metrics_, args.db_file)
+        result_id = store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_features, final_n_features,
+                                  start_time, end_time, cm, args, best_features, args.experiment_name,
+                                  strategy_clustering.metrics_, args.db_file)
 
-    if args.show_results:
-        plot_correlation(args.db_file, 'silhouette_sklearn', 'adjusted_rand_score', 'generation', id=result_id)
+        if args.show_results:
+            plot_correlation(args.db_file, 'silhouette_sklearn', 'adjusted_rand_score', 'generation', id=result_id)
 
-    print(f'Results stored under the ID {result_id}')
+        print(f'Results stored under the ID {result_id}')
 
 
 if __name__ == '__main__':
