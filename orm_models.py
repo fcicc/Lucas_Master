@@ -133,10 +133,12 @@ class Result(Base):
         features_str = '\n\t\t'.join(list(map(str, self.selected_features)))
         labels_str = ','.join(list(map(str, self.result_labels)))
         return f'''{self.id}: {self.name} - {self.start_time}
-    F-Measure   {self.f_measure}
-    Accuracy    {self.accuracy}
+    F-Measure                   {self.f_measure}
+    Accuracy                    {self.accuracy}
+    Initial Number of features  {self.initial_n_features}
+    Final Number of features    {self.final_n_features}
     Args:
-        {args_str}
+    {args_str}
     Result Labels: {labels_str}
     Confusion Matrix:
     {self.confusion_matrix}
@@ -145,10 +147,12 @@ class Result(Base):
     '''
 
     def __str__(self):
-        args_str = '\n\t\t'.join(list(map(str, self.args)))
+        args_str = '\n\t'.join(list(map(str, self.args)))
         return f'''{self.id}: {self.name} - {self.start_time}
-    F-Measure   {self.f_measure}
-    Accuracy    {self.accuracy}
+    F-Measure                   {self.f_measure}
+    Accuracy                    {self.accuracy}
+    Initial Number of features  {self.initial_n_features}
+    Final Number of features    {self.final_n_features}
     Args:
         {args_str}
     '''
