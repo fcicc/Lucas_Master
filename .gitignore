@@ -114,3 +114,5 @@ test_scenario
 petrel
 
 *.db
+
+.idea
