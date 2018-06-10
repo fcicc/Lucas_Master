@@ -7,14 +7,21 @@ from rpy2.robjects import r
 from analysis_utils import class_cluster_match
 
 R_ALLOWED_FITNESSES = [('C_index', -1), ('Calinski_Harabasz', 1), ('Davies_Bouldin', -1),
-                       ('Dunn', 1), ('Gamma', 1), ('G_plus', 1), ('GDI11', 1), ('GDI12', 1),
-                       ('GDI13', 1), ('GDI21', 1), ('GDI22', 1), ('GDI23', 1), ('GDI31', 1),
-                       ('GDI32', 1), ('GDI33', 1), ('GDI41', 1), ('GDI42', 1), ('GDI43', 1),
-                       ('GDI51', 1), ('GDI52', 1), ('GDI53', 1), ('McClain_Rao', -1), ('PBM', 1),
-                       ('Point_Biserial', 1), ('Ray_Turi', -1), ('Ratkowsky_Lance', 1),
-                       ('SD_Scat', -1), ('SD_Dis', -1), ('Silhouette', 1), ('Tau', 1),
+                       ('Dunn', 1), ('Gamma', 1), ('G_plus',
+                                                   1), ('GDI11', 1), ('GDI12', 1),
+                       ('GDI13', 1), ('GDI21', 1), ('GDI22',
+                                                    1), ('GDI23', 1), ('GDI31', 1),
+                       ('GDI32', 1), ('GDI33', 1), ('GDI41',
+                                                    1), ('GDI42', 1), ('GDI43', 1),
+                       ('GDI51', 1), ('GDI52', 1), ('GDI53',
+                                                    1), ('McClain_Rao', -1), ('PBM', 1),
+                       ('Point_Biserial', 1), ('Ray_Turi', -
+                                               1), ('Ratkowsky_Lance', 1),
+                       ('SD_Scat', -1), ('SD_Dis', -
+                                         1), ('Silhouette', 1), ('Tau', 1),
                        ('Wemmert_Gancarski', 1)]
-ALLOWED_FITNESSES = R_ALLOWED_FITNESSES + [('silhouette_sklearn', 1), ('min_silhouette_sklearn', 1)]
+ALLOWED_FITNESSES = R_ALLOWED_FITNESSES + \
+    [('silhouette_sklearn', 1), ('min_silhouette_sklearn', 1)]
 
 
 r('''
@@ -32,7 +39,8 @@ def eval_features(X, ac, metric, samples_dist_matrix, individual):
     if metric == 'min_silhouette_sklearn':
         index1 = np.min(silhouette_samples(X, prediction))
     elif metric == 'silhouette_sklearn':
-        index1 = silhouette_score(samples_dist_matrix, prediction, metric='precomputed')
+        index1 = silhouette_score(
+            samples_dist_matrix, prediction, metric='precomputed')
     else:
         index1 = r['unique_criteria'](X, prediction, metric)
         index1 = np.asarray(index1)[0][0]
@@ -63,12 +71,15 @@ def evaluate_rate_metrics(X, y, ac, samples_dist_matrix, individual):
     y_prediction = class_cluster_match(y, prediction)
 
     fitness_names = list([fit[0] for fit in R_ALLOWED_FITNESSES])
-    X_R = rpy2.robjects.r.matrix(rpy2.robjects.FloatVector(X.flatten()), nrow=X.shape[0])
+    X_R = rpy2.robjects.r.matrix(
+        rpy2.robjects.FloatVector(X.flatten()), nrow=X.shape[0])
 
-    int_idx = r['unique_criteria'](X_R, rpy2.robjects.FloatVector(prediction.tolist()), fitness_names)
+    int_idx = r['unique_criteria'](
+        X_R, rpy2.robjects.FloatVector(prediction.tolist()), fitness_names)
     int_idx = [val[0] for val in list(int_idx)]
 
-    silhouette = silhouette_score(samples_dist_matrix, prediction, metric='precomputed')
+    silhouette = silhouette_score(
+        samples_dist_matrix, prediction, metric='precomputed')
     min_silhouette = np.min(silhouette_samples(X, prediction))
     adj_rand = adjusted_rand_score(y, prediction)
     f1 = f1_score(y, y_prediction, average='weighted')
