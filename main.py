@@ -1,8 +1,11 @@
 import argparse
 import datetime
+import math
 import warnings
+from operator import attrgetter
 
 from rpy2.rinterface import RRuntimeWarning
+from tqdm import tnrange, tqdm
 
 from orm_models import create_if_not_exists
 
@@ -12,6 +15,7 @@ from pso_clustering import PSOClustering
 
 import pandas as pd
 import rpy2
+import numpy as np
 from sklearn import cluster
 from sklearn.metrics import confusion_matrix, silhouette_score, adjusted_rand_score, \
     accuracy_score, f1_score
@@ -64,7 +68,8 @@ def argument_parser() -> argparse.Namespace:
     args = parser.parse_args()
 
     if args.fitness_metric not in [fit[0] for fit in ALLOWED_FITNESSES]:
-        raise ValueError(args.fitness_metric + ' is not an acceptable fitness metric')
+        raise ValueError(args.fitness_metric +
+                         ' is not an acceptable fitness metric')
 
     return args
 
@@ -94,7 +99,7 @@ def run():
     if len(unique_labels(y)) > args.min_features:
         args.min_features = len(unique_labels(y))
 
-    for _ in range(args.run_multiple):
+    for _ in tqdm(range(args.run_multiple)):
         strategy_clustering = None
         if args.strategy == 'ga':
             strategy_clustering = GAClustering(algorithm=ac, n_generations=args.num_gen, perfect=args.perfect,
@@ -115,6 +120,12 @@ def run():
 
         best_features = [col for col, boolean in zip(dataset.columns.values, strategy_clustering.global_best_)
                          if boolean]
+        # population = strategy_clustering.population_.sort(attrgetter('fitness.values'))
+        # best_half_population = np.sum(population[:math.ceil(len(population)/2)], axis=0)
+        # best_features = [feature != 0 for feature in best_half_population]
+        # best_features = [col for col, boolean in zip(dataset.columns.values, best_features)
+        #                  if boolean]
+
         best_prediction = ac.fit(dataset[best_features]).labels_
 
         std_variances = dataset.std(axis=0)
@@ -141,7 +152,8 @@ def run():
                                   strategy_clustering.metrics_, args.db_file)
 
         if args.show_results:
-            plot_correlation(args.db_file, 'silhouette_sklearn', 'adjusted_rand_score', 'generation', id=result_id)
+            plot_correlation(args.db_file, 'silhouette_sklearn',
+                             'adjusted_rand_score', 'generation', id=result_id)
 
         print(f'Results stored under the ID {result_id}')
 

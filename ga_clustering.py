@@ -1,4 +1,5 @@
 import math
+import warnings
 from copy import deepcopy
 from functools import partial
 from multiprocessing import cpu_count
@@ -14,12 +15,14 @@ from tqdm import tqdm
 
 from evaluation_functions import ALLOWED_FITNESSES, eval_features, evaluate, evaluate_rate_metrics
 
-
-def get_toolbox_and_creator(fitness_metric, data_shape):
+def setup_creator(fitness_metric):
     weight = [fit[1] for fit in ALLOWED_FITNESSES if fit[0] == fitness_metric][0]
-    creator.create("FitnessMax", base.Fitness, weights=(weight,))
-    creator.create("Individual", np.ndarray, fitness=creator.FitnessMax)
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', RuntimeWarning)
+        creator.create("FitnessMax", base.Fitness, weights=(1,))
+        creator.create("Individual", np.ndarray, fitness=creator.FitnessMax)
 
+def setup_toolbox(data_shape):
     toolbox = base.Toolbox()
 
     toolbox.register("attr_bool", randint, 0, 1)
@@ -29,7 +32,7 @@ def get_toolbox_and_creator(fitness_metric, data_shape):
     toolbox.register("mutate", tools.mutFlipBit, indpb=0.05)
     toolbox.register("select", tools.selTournament, tournsize=3)
 
-    return toolbox, creator
+    return toolbox
 
 
 def force_bounds(minimum, maximum, individual):
@@ -73,10 +76,11 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
 
         samples_dist_matrix = distance.squareform(distance.pdist(X))
 
-        toolbox, creator = get_toolbox_and_creator(self.fitness_metric, X.shape)
+        setup_creator(self.fitness_metric)
+        toolbox = setup_toolbox(X.shape)
         toolbox.register("evaluate", eval_features, X, self.algorithm, self.fitness_metric, samples_dist_matrix)
 
-        pool = Pool(cpu_count() - 1)
+        pool = Pool(processes=1, initializer=setup_creator, initargs=[self.fitness_metric])
         toolbox.register("map", pool.map)
 
         population = toolbox.population(n=self.pop_size)
@@ -117,6 +121,9 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
                           'complexity']
         metrics = pd.DataFrame(metrics, columns=metrics_names+['generation'])
 
+        pool.close()
+
         self.global_best_ = global_best
+        self.population_ = population
         self.metrics_ = metrics
         self.feature_selection_rate_ = feature_selection_rate

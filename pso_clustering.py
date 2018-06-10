@@ -1,6 +1,7 @@
 import math
 import operator
 import random
+import warnings
 from functools import partial
 from multiprocessing import cpu_count
 from multiprocessing.pool import Pool
@@ -38,12 +39,16 @@ def update_particle(part, global_best, phi1, phi2):
     part[:] = list(map(operator.add, part, part.speed))
 
 
-def get_toolbox_and_creator(fitness_metric, data_shape):
+def setup_creator(fitness_metric):
     weight = [fit[1] for fit in ALLOWED_FITNESSES if fit[0] == fitness_metric][0]
-    creator.create("FitnessMax", base.Fitness, weights=(weight,))
-    creator.create("Individual", list, fitness=creator.FitnessMax, speed=list,
-                   speed_minimum=None, speed_maximum=None, local_best=None)
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', RuntimeWarning)
+        creator.create("FitnessMax", base.Fitness, weights=(weight,))
+        creator.create("Individual", list, fitness=creator.FitnessMax, speed=list,
+                       speed_minimum=None, speed_maximum=None, local_best=None)
 
+
+def setup_toolbox(data_shape):
     toolbox = base.Toolbox()
     mod_speed = 0.1
     toolbox.register("individual", generate, creator=creator, size=data_shape[1], position_minimum=-10,
@@ -51,7 +56,7 @@ def get_toolbox_and_creator(fitness_metric, data_shape):
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("update", update_particle, phi1=1.0, phi2=1.0)
 
-    return toolbox, creator
+    return toolbox
 
 
 class PSOClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
@@ -71,10 +76,11 @@ class PSOClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
 
         samples_dist_matrix = distance.squareform(distance.pdist(X))
 
-        toolbox, creator = get_toolbox_and_creator(self.fitness_metric, X.shape)
+        setup_creator(self.fitness_metric)
+        toolbox = setup_toolbox(X.shape)
         toolbox.register("evaluate", eval_features, X, self.algorithm, self.fitness_metric, samples_dist_matrix)
 
-        pool = Pool(cpu_count() - 1)
+        pool = Pool(processes=1, initializer=setup_creator, initargs=[self.fitness_metric])
         toolbox.register("map", pool.map)
 
         population = toolbox.population(n=self.pop_size)
@@ -103,7 +109,6 @@ class PSOClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
                 if not global_best or global_best.fitness < particle.fitness:
                     global_best = creator.Individual(particle)
                     global_best.fitness.values = particle.fitness.values
-                    print(f'new global best: {global_best[:5]}')
 
             for particle in population:
                 toolbox.update(particle, global_best)
@@ -116,6 +121,9 @@ class PSOClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
                           'complexity']
         metrics = pd.DataFrame(metrics, columns=metrics_names + ['generation'])
 
+        pool.close()
+
         self.global_best_ = global_best
+        self.population_ = population
         self.metrics_ = metrics
         self.feature_selection_rate_ = feature_selection_rate
