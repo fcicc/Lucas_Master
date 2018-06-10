@@ -116,6 +116,7 @@ def plot_correlation(db_file, axis1, axis2, color, id=None, exp_name=None):
             print(f'No results found with name {exp_name}')
 
     df = individual_evaluations
+    df.sort_values(by='generation')
     # df = df.sample(frac=1 / len(results))
 
     plt.figure()
