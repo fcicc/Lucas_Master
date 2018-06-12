@@ -28,7 +28,7 @@ from orm_interface import store_results
 rpy2.robjects.r['options'](warn=-1)
 
 
-def argument_parser() -> argparse.Namespace:
+def argument_parser(args) -> argparse.Namespace:
     """Parse input arguments."""
     parser = argparse.ArgumentParser(
         description='''Code implementation from "A Clustering-based Approach to
@@ -60,12 +60,10 @@ def argument_parser() -> argparse.Namespace:
                         help='sqlite file to store results')
     parser.add_argument('-s', '--strategy', type=str, default='ga',
                         help='ga(Genetic Algorithm) or PSO (Particle Swarm Optimization)')
-    parser.add_argument('-k', '--show-results', action='store_true',
-                        help='enables showing result')
     parser.add_argument('-n', '--run-multiple', type=int, default=1,
                         help='number of multiple runs')
 
-    args = parser.parse_args()
+    args = parser.parse_args(args=args)
 
     if args.fitness_metric not in [fit[0] for fit in ALLOWED_FITNESSES]:
         raise ValueError(args.fitness_metric +
@@ -74,8 +72,8 @@ def argument_parser() -> argparse.Namespace:
     return args
 
 
-def run():
-    args = argument_parser()
+def run(args=None):
+    args = argument_parser(args)
 
     create_if_not_exists(args.db_file)
 
@@ -150,10 +148,6 @@ def run():
         result_id = store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_features, final_n_features,
                                   start_time, end_time, cm, args, best_features, args.experiment_name,
                                   strategy_clustering.metrics_, args.db_file)
-
-        if args.show_results:
-            plot_correlation(args.db_file, 'silhouette_sklearn',
-                             'adjusted_rand_score', 'generation', id=result_id)
 
         print(f'Results stored under the ID {result_id}')
 

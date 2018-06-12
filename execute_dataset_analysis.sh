@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-NGEN=100
+NGEN=500
 POPSIZE=128
 EVALLPROP=1
 MINFEATURES=5
-MAXFEATURES=10000
+MAXFEATURES=50
 
 source activate mestrado
 
- for i in `seq 1 10`;
- do
- 	echo "$i"
- 	python ./main.py ../datasets/CampusBasin/results_ga_hc/dataset.csv "experiment_1" -e $EVALLPROP --num-gen $NGEN --pop-size $POPSIZE --min-features $MINFEATURES --max-features $MAXFEATURES #$(($j*5))
- done
+# for i in `seq 1 50`;
+# do
+# 	echo "$i"
+# 	python ./main.py ../datasets/CampusBasin/results_ga_hc/dataset.csv "experiment_1" -e $EVALLPROP --num-gen $NGEN --pop-size $POPSIZE --min-features $MINFEATURES --max-features $MAXFEATURES #$(($j*5))
+# done
 
- for i in `seq 1 10`;
+ for i in `seq 8 50`;
  do
  	echo "$i"
  	python ./main.py ../datasets/MargemEquatorial/results_ga_hc/dataset.csv "experiment_2" -e $EVALLPROP --num-gen $NGEN --pop-size $POPSIZE --min-features $MINFEATURES --max-features $MAXFEATURES #$(($j*5))
