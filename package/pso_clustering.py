@@ -14,7 +14,7 @@ from deap import tools
 from scipy.spatial import distance
 from tqdm import tqdm
 
-from evaluation_functions import ALLOWED_FITNESSES, eval_features, evaluate_rate_metrics, evaluate
+from .evaluation_functions import ALLOWED_FITNESSES, eval_features, evaluate_rate_metrics, evaluate
 
 
 def generate(size, creator, position_minimum, position_maximum, speed_minimum, speed_maximum):

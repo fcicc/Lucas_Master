@@ -7,11 +7,11 @@ from operator import attrgetter
 from rpy2.rinterface import RRuntimeWarning
 from tqdm import tnrange, tqdm
 
-from orm_models import create_if_not_exists
+from .orm_models import create_if_not_exists
 
 warnings.filterwarnings("ignore", category=RRuntimeWarning)
 
-from pso_clustering import PSOClustering
+from .pso_clustering import PSOClustering
 
 import pandas as pd
 import rpy2
@@ -21,9 +21,9 @@ from sklearn.metrics import confusion_matrix, silhouette_score, adjusted_rand_sc
     accuracy_score, f1_score
 from sklearn.utils.multiclass import unique_labels
 
-from analysis_utils import class_cluster_match, plot_correlation
-from ga_clustering import ALLOWED_FITNESSES, GAClustering
-from orm_interface import store_results
+from .analysis_utils import class_cluster_match, plot_correlation
+from .ga_clustering import ALLOWED_FITNESSES, GAClustering
+from .orm_interface import store_results
 
 rpy2.robjects.r['options'](warn=-1)
 

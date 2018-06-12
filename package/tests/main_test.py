@@ -1,6 +1,6 @@
 import unittest
 
-from main import run
+from package.main import run
 import os
 
 
@@ -10,14 +10,19 @@ class MainTest(unittest.TestCase):
         self.args = ['--num-gen', '10',
                      '--pop-size', '10',
                      '--db-file', self.db_file]
+        self.testing_dataset = '../datasets/CampusBasin/fixed_full_scenario/dataset.csv'
 
     def test_ga(self):
-        self.args += ['test_scenario/dataset.csv', 'TEST']
+        self.args += [
+            self.testing_dataset, 'TEST'
+        ]
         run(args=self.args)
 
     def test_pso(self):
-        self.args += ['test_scenario/dataset.csv', 'TEST',
-                      '--strategy', 'pso']
+        self.args += [
+            self.testing_dataset, 'TEST',
+            '--strategy', 'pso'
+        ]
         run(args=self.args)
 
     def tearDown(self):
