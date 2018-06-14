@@ -2,7 +2,6 @@ import math
 import warnings
 from copy import deepcopy
 from functools import partial
-from multiprocessing import cpu_count
 from multiprocessing.pool import Pool
 from random import randint, choice, sample
 
@@ -15,11 +14,12 @@ from tqdm import tqdm
 
 from .evaluation_functions import ALLOWED_FITNESSES, eval_features, evaluate, evaluate_rate_metrics
 
+
 def setup_creator(fitness_metric):
     weight = [fit[1] for fit in ALLOWED_FITNESSES if fit[0] == fitness_metric][0]
     with warnings.catch_warnings():
         warnings.simplefilter('ignore', RuntimeWarning)
-        creator.create("FitnessMax", base.Fitness, weights=(1,))
+        creator.create("FitnessMax", base.Fitness, weights=(weight,))
         creator.create("Individual", np.ndarray, fitness=creator.FitnessMax)
 
 def setup_toolbox(data_shape):
@@ -80,7 +80,7 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
         toolbox = setup_toolbox(X.shape)
         toolbox.register("evaluate", eval_features, X, self.algorithm, self.fitness_metric, samples_dist_matrix)
 
-        pool = Pool(processes=1, initializer=setup_creator, initargs=[self.fitness_metric])
+        pool = Pool(initializer=setup_creator, initargs=[self.fitness_metric])
         toolbox.register("map", pool.map)
 
         population = toolbox.population(n=self.pop_size)

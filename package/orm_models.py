@@ -30,8 +30,8 @@ def local_create_session(db_file):
 
 class Base(object):
     @declared_attr
-    def __tablename__(cls):
-        name = cls.__name__
+    def __tablename__(self):
+        name = self.__name__
         s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
         return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 

@@ -1,29 +1,26 @@
-import argparse
-import datetime
-import math
-import warnings
-from operator import attrgetter
-
-from rpy2.rinterface import RRuntimeWarning
-from tqdm import tnrange, tqdm
-
-from .orm_models import create_if_not_exists
-
-warnings.filterwarnings("ignore", category=RRuntimeWarning)
-
-from .pso_clustering import PSOClustering
-
 import pandas as pd
 import rpy2
-import numpy as np
+
+from .pso_clustering import PSOClustering
 from sklearn import cluster
 from sklearn.metrics import confusion_matrix, silhouette_score, adjusted_rand_score, \
     accuracy_score, f1_score
+
+import argparse
+import datetime
+import warnings
+
+from rpy2.rinterface import RRuntimeWarning
+from tqdm import tqdm
+
 from sklearn.utils.multiclass import unique_labels
 
-from .analysis_utils import class_cluster_match, plot_correlation
+from .utils import class_cluster_match
 from .ga_clustering import ALLOWED_FITNESSES, GAClustering
 from .orm_interface import store_results
+from .orm_models import create_if_not_exists
+
+warnings.filterwarnings("ignore", category=RRuntimeWarning)
 
 rpy2.robjects.r['options'](warn=-1)
 
@@ -97,6 +94,7 @@ def run(args=None):
     if len(unique_labels(y)) > args.min_features:
         args.min_features = len(unique_labels(y))
 
+    results_ids = []
     for _ in tqdm(range(args.run_multiple)):
         strategy_clustering = None
         if args.strategy == 'ga':
@@ -147,9 +145,11 @@ def run(args=None):
 
         result_id = store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_features, final_n_features,
                                   start_time, end_time, cm, args, best_features, args.experiment_name,
-                                  strategy_clustering.metrics_, args.db_file)
+                                  strategy_clustering.metrics_, args.db_file, best_prediction)
 
-        print(f'Results stored under the ID {result_id}')
+        results_ids.append(result_id)
+
+    print(f'Results stored under the ID {results_ids}')
 
 
 if __name__ == '__main__':

@@ -1,9 +1,9 @@
 from .orm_models import Result, ConfusionMatrix, ConfusionMatrixNumber, ConfusionMatrixLabel, SelectedFeature, Arg, \
-    local_create_session
+    local_create_session, ClusterLabel
 
 
 def store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_features, final_n_features, start_time,
-                  end_time, confusion_matrix, args, selected_columns, result_name, ga_metrics, db_file):
+                  end_time, confusion_matrix, args, selected_columns, result_name, ga_metrics, db_file, cluster_labels):
     """
 
     :type db_file: str
@@ -87,6 +87,15 @@ def store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_fea
         )
         selected_features_entries.append(selected_features_entry)
     session.bulk_save_objects(selected_features_entries)
+
+    cluster_labels_entries = []
+    for label in cluster_labels:
+        cluster_label_entry = ClusterLabel(
+            result_id=result_entry.id,
+            label=str(label)
+        )
+        cluster_labels_entries.append(cluster_label_entry)
+    session.bulk_save_objects(cluster_labels_entries)
 
     session.commit()
     result_entry_id = result_entry.id
