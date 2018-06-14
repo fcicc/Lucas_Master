@@ -10,7 +10,7 @@ class MainTest(unittest.TestCase):
         self.args = ['--num-gen', '10',
                      '--pop-size', '10',
                      '--db-file', self.db_file]
-        self.testing_dataset = '../datasets/CampusBasin/fixed_full_scenario/dataset.csv'
+        self.testing_dataset = '../../../datasets/CampusBasin/fixed_full_scenario/dataset.csv'
 
     def test_ga(self):
         self.args += [
