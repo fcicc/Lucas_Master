@@ -12,6 +12,8 @@ from sqlalchemy import asc
 from sqlalchemy.exc import OperationalError
 
 from package.orm_models import Result, local_create_session
+from package.preprocessing import binaryze_column
+from package.utils import class_cluster_match
 
 
 def argument_parser() -> argparse.Namespace:
@@ -267,6 +269,8 @@ def show_result(args):
 
 def filter_dataset(args):
     df: pd.DataFrame = pd.read_csv(args.input_file, index_col=0)
+    # binarized_grain_size = binaryze_column(df['Main/single size mode(mm):'])
+    # df = pd.concat([df, binarized_grain_size], axis=1)
 
     session = local_create_session(args.db_file)
 
@@ -281,7 +285,9 @@ def filter_dataset(args):
     session.close()
 
     df = df.filter(items=columns+['petrofacie'])
-    df['Cluster'] = pd.Series(np.asarray(labels))
+    df['Cluster'] = pd.Series(labels, index=df.index)
+    labels = class_cluster_match(df['petrofacie'].values, labels)
+    df['Cluster label'] = pd.Series(labels, index=df.index)
 
     if args.output_file:
         df.to_csv(args.output_file, quoting=csv.QUOTE_NONNUMERIC, float_format='%.10f', index=True)

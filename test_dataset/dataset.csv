@@ -1,0 +1,6 @@
+,feature A,feature B,feature C,feature D,feature E,feature F,petrofacie
+WELL1,0,0,0.3300000131,0,0,0,A
+WELL2,0,0,0.6700000167,0,0,0,B
+WELL3,0,0,0,0,0,0,C
+WELL4,0,0,0.3300000131,0,0,0,C
+WELL5,0,0,0.6700000167,0,0,0,A
