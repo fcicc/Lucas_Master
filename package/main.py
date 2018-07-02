@@ -1,6 +1,8 @@
 import pandas as pd
 import rpy2
 
+from package.coclustering import CoClustering
+from package.preprocessing import binaryze_column, range_grain_size
 from .pso_clustering import PSOClustering
 from sklearn import cluster
 from sklearn.metrics import confusion_matrix, silhouette_score, adjusted_rand_score, \
@@ -75,9 +77,11 @@ def run(args=None):
     create_if_not_exists(args.db_file)
 
     df = pd.read_csv(args.input_file, index_col=0, header=0)
+    # df = range_grain_size(df)
 
     y = df['petrofacie'].values
     del df['petrofacie']
+    del df['Microscopic - Sorting:']
     dataset = df
 
     dataset = dataset.reset_index(drop=True)
@@ -104,6 +108,10 @@ def run(args=None):
                                                pop_eval_rate=args.eval_rate)
         elif args.strategy == 'pso':
             strategy_clustering = PSOClustering(algorithm=ac, n_generations=args.num_gen, perfect=args.perfect,
+                                                fitness_metric=args.fitness_metric, pop_size=args.pop_size,
+                                                pop_eval_rate=args.eval_rate)
+        elif args.strategy == 'cocluster':
+            strategy_clustering = CoClustering(algorithm=ac, n_generations=args.num_gen, perfect=args.perfect,
                                                 fitness_metric=args.fitness_metric, pop_size=args.pop_size,
                                                 pop_eval_rate=args.eval_rate)
 
@@ -150,6 +158,8 @@ def run(args=None):
         results_ids.append(result_id)
 
     print(f'Results stored under the ID {results_ids}')
+
+    return results_ids
 
 
 if __name__ == '__main__':

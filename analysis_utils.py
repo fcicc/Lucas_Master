@@ -4,6 +4,7 @@ import glob
 import os
 from typing import List
 
+import lasio
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -41,6 +42,8 @@ def argument_parser() -> argparse.Namespace:
     parser.add_argument('--exp-name', type=str, default=None)
     parser.add_argument('--db-file', type=str, default='./local.db', help='sqlite file to store results')
     parser.add_argument('--select-best', action='store_true')
+    parser.add_argument('--logs-folder', type=str, default=None)
+    parser.add_argument('--plot-logs', action='store_true')
 
     args = parser.parse_args()
 
@@ -49,7 +52,8 @@ def argument_parser() -> argparse.Namespace:
             args.useful_features, args.melt_results,
             args.average_feature_selection, args.list_results,
             args.detail_result, args.confusion_matrix,
-            args.filter, args.select_best]) != 1:
+            args.filter, args.select_best,
+            args.plot_logs]) != 1:
         raise ValueError("Cannot have this combination of arguments.")
 
     return args
@@ -183,6 +187,17 @@ def merge_results(args):
         all_results.to_csv(args.output_file, quoting=csv.QUOTE_NONNUMERIC, float_format='%.10f', index=True)
     else:
         print(all_results)
+
+
+def plot_logs(args):
+    las_files = glob.glob(f'{args.logs_folder}/*.las')
+    las_files = list(map(lasio.read, las_files))
+
+    for las in las_files:
+        if len(las.curves) > 2:
+            las.df().plot()
+
+    plt.show()
 
 
 def correct_wells_names(well_name):
@@ -341,6 +356,8 @@ def main():
         filter_dataset(args)
     elif args.select_best:
         select_best(args)
+    elif args.plot_logs:
+        plot_logs(args)
 
 
 if __name__ == '__main__':

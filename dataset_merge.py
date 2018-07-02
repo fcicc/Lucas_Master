@@ -14,7 +14,7 @@ def argument_parser() -> argparse.Namespace:
 
     parser.add_argument('input_folder', type=str, default='test_scenario',
                         help='input CSV file')
-    
+
     args = parser.parse_args()
 
     return args
@@ -22,8 +22,6 @@ def argument_parser() -> argparse.Namespace:
 
 def run():
     args = argument_parser()
-    
-    args.input_folder = '../datasets/TalaraBasin/'
 
     print('GATHERING FILES at ' + args.input_folder)
     csv_file_names = [
@@ -85,15 +83,15 @@ def run():
         return False
 
     def local_filter(x):
-        print('--------------------------------------')
-        print(x.values)
-        if x.name == 'petrofacie':
+        if x.name == 'petrofacie' or x.name == 'Microscopic - Sorting:':
             return True
         elif all(x.apply(is_number)):
             return True
         else:
+            print(x.name)
             return False
 
+    print('Removing columns:')
     csv_data_files = [df[df.apply(local_filter, axis=1)] for df in csv_data_files]
 
     csv_data_files = [df.dropna(axis=0, how='any') for df in csv_data_files]
@@ -107,7 +105,29 @@ def run():
     full_csv = pd.concat(csv_data_files, axis=1)
     full_csv = full_csv.fillna(value=0)
 
-    full_csv = full_csv.transpose()
+    full_csv: pd.DataFrame = full_csv.transpose()
+
+    def phi_translate(val):
+        """
+
+        :type val: str
+        """
+        if isinstance(val, str):
+            lower = val.lower()
+            if lower == 'very well sorted' or lower == 'muito bem selecionado':
+                return 0.175
+            elif lower == 'well sorted' or lower == 'bem selecionado':
+                return .425
+            elif lower == 'moderately sorted' or lower == 'moderadamente selecionado':
+                return .75
+            elif lower == 'poorly sorted' or lower == 'mal selecionado':
+                return 1.5
+            elif lower == 'very poorly sorted' or lower == 'muito mal selecionado':
+                return 3
+        else:
+            return 0
+
+    full_csv['Phi stdev sorting'] = full_csv['Microscopic - Sorting:'].map(phi_translate)
 
     full_csv.to_csv(join(args.input_folder, 'dataset.csv'), encoding='utf-8', quoting=csv.QUOTE_NONNUMERIC,
                     float_format='%.10f')
