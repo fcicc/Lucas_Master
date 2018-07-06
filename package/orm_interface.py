@@ -1,4 +1,4 @@
-from .orm_models import Result, ConfusionMatrix, ConfusionMatrixNumber, ConfusionMatrixLabel, SelectedFeature, Arg, \
+from package.orm_models import Result, ConfusionMatrix, ConfusionMatrixNumber, ConfusionMatrixLabel, SelectedFeature, Arg, \
     local_create_session, ClusterLabel
 
 

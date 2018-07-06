@@ -2,8 +2,8 @@ import pandas as pd
 import rpy2
 
 from package.coclustering import CoClustering
-from package.preprocessing import binaryze_column, range_grain_size
-from .pso_clustering import PSOClustering
+# from package.preprocessing import binaryze_column, range_grain_size
+from package.pso_clustering import PSOClustering
 from sklearn import cluster
 from sklearn.metrics import confusion_matrix, silhouette_score, adjusted_rand_score, \
     accuracy_score, f1_score
@@ -17,15 +17,14 @@ from tqdm import tqdm
 
 from sklearn.utils.multiclass import unique_labels
 
-from .utils import class_cluster_match
-from .ga_clustering import ALLOWED_FITNESSES, GAClustering
-from .orm_interface import store_results
-from .orm_models import create_if_not_exists
+from package.utils import class_cluster_match
+from package.ga_clustering import ALLOWED_FITNESSES, GAClustering
+from package.orm_interface import store_results
+from package.orm_models import create_if_not_exists
 
 warnings.filterwarnings("ignore", category=RRuntimeWarning)
 
 rpy2.robjects.r['options'](warn=-1)
-
 
 def argument_parser(args) -> argparse.Namespace:
     """Parse input arguments."""
@@ -50,15 +49,15 @@ def argument_parser(args) -> argparse.Namespace:
     parser.add_argument('--max-features', type=int, default=50,
                         help='maximum number of features to be considered')
     parser.add_argument('--fitness-metric', type=str, default='silhouette_sklearn',
-                        help='fitness function to be used')
+                        help='fitness function to be used', choices=[fitnes_str for fitnes_str, _ in ALLOWED_FITNESSES])
     parser.add_argument('--cluster-algorithm', type=str, default='agglomerative',
-                        help='cluster algorithm to be used')
+                        help='cluster algorithm to be used', choices=['agglomerative', 'kmeans'])
     parser.add_argument('-d', '--dont-use-ga', action='store_true',
                         help='disables the use of GA and apply cluster to all dimensions')
     parser.add_argument('-o', '--db-file', type=str, default='./local.db',
                         help='sqlite file to store results')
     parser.add_argument('-s', '--strategy', type=str, default='ga',
-                        help='ga(Genetic Algorithm) or PSO (Particle Swarm Optimization)')
+                        help='ga(Genetic Algorithm) or PSO (Particle Swarm Optimization)', choices=['ga', 'pso'])
     parser.add_argument('-n', '--run-multiple', type=int, default=1,
                         help='number of multiple runs')
 
@@ -71,6 +70,7 @@ def argument_parser(args) -> argparse.Namespace:
     return args
 
 
+# @Gooey
 def run(args=None):
     args = argument_parser(args)
 

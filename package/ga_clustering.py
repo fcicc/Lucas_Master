@@ -12,7 +12,7 @@ from deap import creator, tools, base, algorithms
 from scipy.spatial import distance
 from tqdm import tqdm
 
-from .evaluation_functions import ALLOWED_FITNESSES, eval_features, evaluate, evaluate_rate_metrics
+from package.evaluation_functions import ALLOWED_FITNESSES, eval_features, evaluate, evaluate_rate_metrics
 
 
 def force_bounds(minimum, maximum, individual):

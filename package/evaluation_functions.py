@@ -4,7 +4,7 @@ from sklearn.metrics import silhouette_samples, silhouette_score, accuracy_score
 
 from rpy2.robjects import r
 
-from .utils import class_cluster_match
+from package.utils import class_cluster_match
 
 R_ALLOWED_FITNESSES = [('C_index', -1), ('Calinski_Harabasz', 1), ('Davies_Bouldin', -1),
                        ('Dunn', 1), ('Gamma', 1), ('G_plus',
