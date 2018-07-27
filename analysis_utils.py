@@ -17,7 +17,7 @@ from package.preprocessing import binaryze_column
 from package.utils import class_cluster_match
 
 
-def argument_parser() -> argparse.Namespace:
+def argument_parser(args) -> argparse.Namespace:
     """Parse input arguments."""
     parser = argparse.ArgumentParser(
         description='''Analysis over input data''')
@@ -38,14 +38,14 @@ def argument_parser() -> argparse.Namespace:
     parser.add_argument('--detail-result', action='store_true')
     parser.add_argument('--confusion-matrix', action='store_true')
     parser.add_argument('--filter', action='store_true')
-    parser.add_argument('--id', type=int, default=None)
+    parser.add_argument('--id', type=int, default=None, nargs='+')
     parser.add_argument('--exp-name', type=str, default=None)
     parser.add_argument('--db-file', type=str, default='./local.db', help='sqlite file to store results')
     parser.add_argument('--select-best', action='store_true')
     parser.add_argument('--logs-folder', type=str, default=None)
     parser.add_argument('--plot-logs', action='store_true')
 
-    args = parser.parse_args()
+    args = parser.parse_args(args=args)
 
     if sum([args.plot_correlation, args.correlation,
             args.merge_results,
@@ -65,12 +65,9 @@ def confusion_matrix(args):
 
     session = local_create_session(args.db_file)
 
-    cm = []
     if args.id:
         try:
-            result: Result = session.query(Result).filter(Result.id == args.id).first()
-
-            cm = result.confusion_matrix.as_dataframe()
+            results: List[Result] = session.query(Result).filter(Result.id.in_(args.id)).all()
 
         except OperationalError:
             print(f'No results found with id {args.id}')
@@ -78,18 +75,20 @@ def confusion_matrix(args):
         try:
             results: List[Result] = session.query(Result).filter(Result.name == args.exp_name).all()
 
-            cm = sum([result.confusion_matrix.as_dataframe() for result in results])
-
         except OperationalError:
             print(f'No results found with name {args.exp_name}')
 
+    cm = sum([result.confusion_matrix.as_dataframe() for result in results])
+
     if args.output_file:
         cm.to_csv(args.output_file, quoting=csv.QUOTE_NONNUMERIC, float_format='%.10f', index=True)
-    else:
-        with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-            print(cm)
+    # else:
+    #     with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+    #         print(cm)
 
     session.close()
+
+    return cm
 
 
 def plot_correlation(db_file, axis1, axis2, color, id=None, exp_name=None):
@@ -101,15 +100,19 @@ def plot_correlation(db_file, axis1, axis2, color, id=None, exp_name=None):
     individual_evaluations = []
     if id:
         try:
-            result: Result = session.query(Result).filter(Result.id == id).first()
+            results: List[Result] = session.query(Result).filter(Result.id.in_(id)).all()
+            if len(results) == 0:
+                raise ValueError(f'No results found with name {exp_name}')
 
-            individual_evaluations = result.individual_evaluations
+            individual_evaluations = pd.concat([result.individual_evaluations for result in results])
 
         except OperationalError:
             print(f'No results found with id {id}')
     else:
         try:
             results: List[Result] = session.query(Result).filter(Result.name == exp_name).all()
+            if len(results) == 0:
+                raise ValueError(f'No results found with name {exp_name}')
 
             individual_evaluations = pd.concat([result.individual_evaluations for result in results])
 
@@ -117,7 +120,7 @@ def plot_correlation(db_file, axis1, axis2, color, id=None, exp_name=None):
             print(f'No results found with name {exp_name}')
 
     df = individual_evaluations
-    df.sort_values(by='generation')
+    df.sort_values(by='generation', ascending=True)
     # df = df.sample(frac=1 / len(results))
 
     plt.figure()
@@ -126,7 +129,6 @@ def plot_correlation(db_file, axis1, axis2, color, id=None, exp_name=None):
     c = df[color].values
     points = plt.scatter(x, y, c=c, s=1, cmap='viridis', alpha=0.5)
     plt.colorbar(points, label=color)
-
     sns.regplot(axis1, axis2, data=df, scatter=False, x_jitter=0.005, y_jitter=0.005, order=1, robust=False)
 
     plt.show()
@@ -299,7 +301,7 @@ def filter_dataset(args):
 
     session.close()
 
-    df = df.filter(items=columns+['petrofacie'])
+    df = df.filter(items=columns + ['petrofacie'])
     df['Cluster'] = pd.Series(labels, index=df.index)
     labels = class_cluster_match(df['petrofacie'].values, labels)
     df['Cluster label'] = pd.Series(labels, index=df.index)
@@ -330,8 +332,10 @@ def select_best(args):
     session.close()
 
 
-def main():
-    args = argument_parser()
+def main(args=None):
+    args = argument_parser(args)
+
+    result = None
 
     if args.plot_correlation:
         plot_correlation(args.db_file, args.axis1, args.axis2, args.color, id=args.id, exp_name=args.exp_name)
@@ -351,13 +355,15 @@ def main():
     elif args.detail_result:
         show_result(args)
     elif args.confusion_matrix:
-        confusion_matrix(args)
+        result = confusion_matrix(args)
     elif args.filter:
         filter_dataset(args)
     elif args.select_best:
         select_best(args)
     elif args.plot_logs:
         plot_logs(args)
+
+    return result
 
 
 if __name__ == '__main__':

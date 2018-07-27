@@ -15,12 +15,18 @@ class MainTest(unittest.TestCase):
         self.args = ['--num-gen', '10',
                      '--pop-size', '10',
                      '--db-file', self.db_file]
-        print(glob.glob('./*'))
         self.testing_dataset = './test_dataset/dataset.csv'
 
     def test_ga(self):
         self.args += [
             self.testing_dataset, self.exp_name
+        ]
+        run(args=self.args)
+
+    def test_porosity_scale(self):
+        self.args += [
+            self.testing_dataset, self.exp_name,
+            '--beta', '1.5'
         ]
         run(args=self.args)
 
@@ -30,6 +36,22 @@ class MainTest(unittest.TestCase):
             '--strategy', 'pso'
         ]
         run(args=self.args)
+
+    def test_multiple_run(self):
+        exp_name = 'TEST_MULTIPLE'
+        n_runs = 2
+        self.args += [
+            '--run-multiple', str(n_runs),
+            self.testing_dataset, exp_name
+        ]
+        run(args=self.args)
+
+        session = local_create_session(self.db_file)
+        results = session.query(Result).filter(Result.name== exp_name).all()
+        n_results = len(results)
+        session.close()
+
+        self.assertEqual(n_runs, n_results)
 
     def test_feature_limit_ga(self):
         self.args += [

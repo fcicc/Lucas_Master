@@ -1,3 +1,5 @@
+import copy
+
 import pandas as pd
 import rpy2
 
@@ -25,6 +27,7 @@ from package.orm_models import create_if_not_exists
 warnings.filterwarnings("ignore", category=RRuntimeWarning)
 
 rpy2.robjects.r['options'](warn=-1)
+
 
 def argument_parser(args) -> argparse.Namespace:
     """Parse input arguments."""
@@ -60,6 +63,8 @@ def argument_parser(args) -> argparse.Namespace:
                         help='ga(Genetic Algorithm) or PSO (Particle Swarm Optimization)', choices=['ga', 'pso'])
     parser.add_argument('-n', '--run-multiple', type=int, default=1,
                         help='number of multiple runs')
+    parser.add_argument('--beta', type=float, default=1,
+                        help='silhouette upscale explained by the grain-size')
 
     args = parser.parse_args(args=args)
 
@@ -71,17 +76,66 @@ def argument_parser(args) -> argparse.Namespace:
 
 
 # @Gooey
+def upscale_grain_size(df, beta):
+    alpha = 1
+    learning_rate = 1
+
+    X = df.iloc[:, :-1].values
+    Y = df.iloc[:, -1].values
+
+    ac = cluster.AgglomerativeClustering(n_clusters=len(unique_labels(Y)),
+                                         affinity='manhattan',
+                                         linkage='complete')
+
+    y = ac.fit_predict(X)
+    silhouette = silhouette_score(X, y)
+    target_silhouette = silhouette * beta
+
+    internal_df = copy.deepcopy(df)
+    alphas = [alpha]
+    silhouettes = [silhouette]
+
+    variance_variable = [column for column in df.columns.values if '(mm)' in column][0]
+
+    count_loop = 0
+    while silhouette < target_silhouette:
+        count_loop += 1
+        alpha += learning_rate
+        internal_df[variance_variable] = df[variance_variable] * alpha
+        X = internal_df.iloc[:, :-1].values
+        y = ac.fit_predict(X)
+        silhouette = silhouette_score(X, y)
+        alphas += [alpha]
+        silhouettes += [silhouette]
+
+        if count_loop > 10000:
+            print('Breaking!')
+            break
+
+    print(f'Alpha = {alpha}')
+    print(f'Silhouette = {silhouette}')
+
+    df[variance_variable] = internal_df[variance_variable]
+
+    return df
+
+
 def run(args=None):
     args = argument_parser(args)
 
     create_if_not_exists(args.db_file)
 
     df = pd.read_csv(args.input_file, index_col=0, header=0)
-    # df = range_grain_size(df)
+
+    if 'Microscopic - Sorting:' in df.columns:
+        del df['Microscopic - Sorting:']
+
+    if args.beta > 1:
+        df = upscale_grain_size(df, args.beta)
 
     y = df['petrofacie'].values
     del df['petrofacie']
-    del df['Microscopic - Sorting:']
+
     dataset = df
 
     dataset = dataset.reset_index(drop=True)
@@ -112,8 +166,8 @@ def run(args=None):
                                                 pop_eval_rate=args.eval_rate)
         elif args.strategy == 'cocluster':
             strategy_clustering = CoClustering(algorithm=ac, n_generations=args.num_gen, perfect=args.perfect,
-                                                fitness_metric=args.fitness_metric, pop_size=args.pop_size,
-                                                pop_eval_rate=args.eval_rate)
+                                               fitness_metric=args.fitness_metric, pop_size=args.pop_size,
+                                               pop_eval_rate=args.eval_rate)
 
         start_time = datetime.datetime.now()
         if args.eval_rate:
