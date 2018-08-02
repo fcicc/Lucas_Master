@@ -2,6 +2,7 @@ import math
 import warnings
 from copy import deepcopy
 from functools import partial
+from multiprocessing import cpu_count
 from multiprocessing.pool import Pool
 import random
 
@@ -101,7 +102,7 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
         toolbox = setup_toolbox(X.shape, self.min_features, self.max_features)
         toolbox.register("evaluate", eval_features, X, self.algorithm, self.fitness_metric, samples_dist_matrix)
 
-        pool = Pool(initializer=setup_creator, initargs=[self.fitness_metric])
+        pool = Pool(processes=cpu_count()-1, initializer=setup_creator, initargs=[self.fitness_metric])
         toolbox.register("map", pool.map)
 
         population = toolbox.population(n=self.pop_size)

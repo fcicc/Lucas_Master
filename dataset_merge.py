@@ -1,6 +1,8 @@
 import argparse
+import copy
 import csv
 import os
+import numpy as np
 from functools import partial
 from os.path import isfile, join
 import pandas as pd
@@ -13,7 +15,10 @@ def argument_parser() -> argparse.Namespace:
                        Identify Petrofacies from Petrographic Data".''')
 
     parser.add_argument('input_folder', type=str, default='test_scenario',
-                        help='input CSV file')
+                        help='input CSV folder')
+
+    parser.add_argument('output_file', type=str, default='dataset.csv',
+                        help='output CSV file')
 
     args = parser.parse_args()
 
@@ -27,8 +32,8 @@ def run():
     csv_file_names = [
         file_name for file_name in os.listdir(args.input_folder)
         if isfile(join(args.input_folder, file_name))
-           and file_name.endswith('.csv')
-           and file_name != 'dataset.csv'
+        and file_name.endswith('.csv')
+        and file_name != 'dataset.csv'
     ]
     print('DONE')
 
@@ -38,24 +43,9 @@ def run():
         for csv_file_name in csv_file_names]
     dfs = []
     for csv_file in csv_data_files:
-        dfs.append(csv_file.applymap(partial(pd.to_numeric, errors='ignore')))
+        df = csv_file.applymap(partial(pd.to_numeric, errors='ignore'))
+        dfs.append(df)
     csv_data_files = dfs
-
-    for csv_file in csv_data_files:
-        features = csv_file.index.values
-        processed_features = []
-        for feature in features:
-            n_attributes = feature.count(' - ') + 1
-            if n_attributes == 3:
-                processed_features.append('[primary]' + feature)
-            elif n_attributes == 7:
-                processed_features.append('[diagenetic]' + feature)
-            elif n_attributes == 6:
-                processed_features.append('[porosity]' + feature)
-            else:
-                processed_features.append(feature)
-
-        csv_file.index = processed_features
 
     print('DONE')
 
@@ -68,33 +58,40 @@ def run():
                 df_list.append(index)
                 print('\t' + str(index))
 
-    def is_number(s):
-        try:
-            float(s)
-            return True
-        except (ValueError, TypeError):
-            pass
-        try:
-            import unicodedata
-            unicodedata.numeric(s)
-            return True
-        except (TypeError, ValueError):
-            pass
-        return False
+    print('Removing rows:')
+    csv_data_files_filtered = []
+    for df in csv_data_files:
+        df = df.loc[df.index.drop_duplicates(), :]
+        df_clone = copy.deepcopy(df)
+        for index in df.index:
+            if type(index) != str:
+                continue
+            n_attributes = index.count(' - ') + 1
+            if n_attributes in [3, 7, 6]:
+                class_str = None
+                if n_attributes == 3:
+                    class_str = '[primary]'
+                elif n_attributes == 7:
+                    class_str = '[diagenetic]'
+                elif n_attributes == 6:
+                    class_str = '[porosity]'
+                df_clone.rename({index: class_str + index}, inplace=True, axis='index')
+            elif 'sorting' in index.lower():
+                df_clone.rename({index: 'sorting'}, inplace=True, axis='index')
+            elif '(mm)' in index.lower() and 'main' in index.lower():
+                df_clone.rename({index: 'grain_size'}, inplace=True, axis='index')
+            elif index.lower() == 'porosity':
+                df_clone.rename({index: 'porosity'}, inplace=True, axis='index')
+            elif index.lower() == 'petrofacie':
+                pass
+            else:
+                print(f'DROP {index}')
+                df_clone.drop(index=index, inplace=True)
+        csv_data_files_filtered += [df_clone]
 
-    def local_filter(x):
-        if x.name == 'petrofacie' or x.name == 'Microscopic - Sorting:':
-            return True
-        elif all(x.apply(is_number)):
-            return True
-        else:
-            print(x.name)
-            return False
+    csv_data_files = csv_data_files_filtered
 
-    print('Removing columns:')
-    csv_data_files = [df[df.apply(local_filter, axis=1)] for df in csv_data_files]
-
-    csv_data_files = [df.dropna(axis=0, how='any') for df in csv_data_files]
+    csv_data_files = [df.dropna(axis=0, how='all') for df in csv_data_files]
 
     csv_data_files = [df.groupby(df.index).sum() for df in csv_data_files]
 
@@ -102,7 +99,7 @@ def run():
     print(sum(df.shape[1] for df in csv_data_files))
     print('MERGING DATA')
 
-    full_csv = pd.concat(csv_data_files, axis=1)
+    full_csv = pd.concat(csv_data_files, axis=1, sort=False)
     full_csv = full_csv.fillna(value=0)
 
     full_csv: pd.DataFrame = full_csv.transpose()
@@ -127,9 +124,15 @@ def run():
         else:
             return 0
 
-    full_csv['Phi stdev sorting'] = full_csv['Microscopic - Sorting:'].map(phi_translate)
+    if 'sorting' in full_csv.columns.values:
+        full_csv['Phi stdev sorting'] = full_csv['sorting'].map(phi_translate)
 
-    full_csv.to_csv(join(args.input_folder, 'dataset.csv'), encoding='utf-8', quoting=csv.QUOTE_NONNUMERIC,
+    cols = list(full_csv.columns.values)
+    cols.remove('petrofacie')
+    cols += ['petrofacie']
+    full_csv = full_csv[cols]
+
+    full_csv.to_csv(args.output_file, encoding='utf-8', quoting=csv.QUOTE_NONNUMERIC,
                     float_format='%.10f')
 
     print('DONE!')

@@ -116,3 +116,5 @@ petrel
 *.db
 
 execute_dataset_analysis.py
+
+datasets*

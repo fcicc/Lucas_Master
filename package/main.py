@@ -75,7 +75,6 @@ def argument_parser(args) -> argparse.Namespace:
     return args
 
 
-# @Gooey
 def upscale_grain_size(df, beta):
     alpha = 1
     learning_rate = 1
@@ -108,7 +107,7 @@ def upscale_grain_size(df, beta):
         alphas += [alpha]
         silhouettes += [silhouette]
 
-        if count_loop > 10000:
+        if count_loop > 100000:
             print('Breaking!')
             break
 
