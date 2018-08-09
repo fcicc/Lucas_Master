@@ -5,6 +5,7 @@ import rpy2
 
 from package.coclustering import CoClustering
 # from package.preprocessing import binaryze_column, range_grain_size
+from package.evaluation_functions import custom_distance
 from package.pso_clustering import PSOClustering
 from sklearn import cluster
 from sklearn.metrics import confusion_matrix, silhouette_score, adjusted_rand_score, \
@@ -63,8 +64,6 @@ def argument_parser(args) -> argparse.Namespace:
                         help='ga(Genetic Algorithm) or PSO (Particle Swarm Optimization)', choices=['ga', 'pso'])
     parser.add_argument('-n', '--run-multiple', type=int, default=1,
                         help='number of multiple runs')
-    parser.add_argument('--beta', type=float, default=1,
-                        help='silhouette upscale explained by the grain-size')
 
     args = parser.parse_args(args=args)
 
@@ -75,50 +74,6 @@ def argument_parser(args) -> argparse.Namespace:
     return args
 
 
-def upscale_grain_size(df, beta):
-    alpha = 1
-    learning_rate = 1
-
-    X = df.iloc[:, :-1].values
-    Y = df.iloc[:, -1].values
-
-    ac = cluster.AgglomerativeClustering(n_clusters=len(unique_labels(Y)),
-                                         affinity='manhattan',
-                                         linkage='complete')
-
-    y = ac.fit_predict(X)
-    silhouette = silhouette_score(X, y)
-    target_silhouette = silhouette * beta
-
-    internal_df = copy.deepcopy(df)
-    alphas = [alpha]
-    silhouettes = [silhouette]
-
-    variance_variable = [column for column in df.columns.values if '(mm)' in column][0]
-
-    count_loop = 0
-    while silhouette < target_silhouette:
-        count_loop += 1
-        alpha += learning_rate
-        internal_df[variance_variable] = df[variance_variable] * alpha
-        X = internal_df.iloc[:, :-1].values
-        y = ac.fit_predict(X)
-        silhouette = silhouette_score(X, y)
-        alphas += [alpha]
-        silhouettes += [silhouette]
-
-        if count_loop > 100000:
-            print('Breaking!')
-            break
-
-    print(f'Alpha = {alpha}')
-    print(f'Silhouette = {silhouette}')
-
-    df[variance_variable] = internal_df[variance_variable]
-
-    return df
-
-
 def run(args=None):
     args = argument_parser(args)
 
@@ -126,11 +81,12 @@ def run(args=None):
 
     df = pd.read_csv(args.input_file, index_col=0, header=0)
 
-    if 'Microscopic - Sorting:' in df.columns:
-        del df['Microscopic - Sorting:']
+    del df['grain_size']
+    del df['sorting']
+    del df['Phi stdev sorting']
 
-    if args.beta > 1:
-        df = upscale_grain_size(df, args.beta)
+    # if args.beta > 1:
+    #     df = upscale_grain_size(df, args.beta)
 
     y = df['petrofacie'].values
     del df['petrofacie']
@@ -143,7 +99,7 @@ def run(args=None):
     ac = None
     if args.cluster_algorithm == 'agglomerative':
         ac = cluster.AgglomerativeClustering(n_clusters=len(unique_labels(y)),
-                                             affinity='manhattan',
+                                             affinity=custom_distance,
                                              linkage='complete')
     elif args.cluster_algorithm == 'kmeans':
         ac = cluster.KMeans(n_clusters=len(unique_labels(y)), n_init=100)
@@ -175,22 +131,20 @@ def run(args=None):
             strategy_clustering.fit(dataset_matrix)
         end_time = datetime.datetime.now()
 
-        best_features = [col for col, boolean in zip(dataset.columns.values, strategy_clustering.global_best_)
-                         if boolean]
-        # population = strategy_clustering.population_.sort(attrgetter('fitness.values'))
-        # best_half_population = np.sum(population[:math.ceil(len(population)/2)], axis=0)
-        # best_features = [feature != 0 for feature in best_half_population]
-        # best_features = [col for col, boolean in zip(dataset.columns.values, best_features)
-        #                  if boolean]
+        if args.strategy == 'pso':
+            best_weights = strategy_clustering.global_best_
+            best_prediction = ac.fit(dataset.values*best_weights).labels_
+            best_features = dataset.columns.values
+        else:
+            best_features = [col for col, boolean in zip(dataset.columns.values, strategy_clustering.global_best_)
+                             if boolean]
+            best_prediction = ac.fit(dataset[best_features]).labels_
 
-        best_prediction = ac.fit(dataset[best_features]).labels_
-
-        std_variances = dataset.std(axis=0)
-
-        result = {
-            feature: std_variance for feature, std_variance in zip(best_features, std_variances)}
-        result = pd.DataFrame.from_dict(result, orient='index')
-        result.columns = ['std']
+        # std_variances = dataset.std(axis=0)
+        # result = {
+        #     feature: std_variance for feature, std_variance in zip(best_features, std_variances)}
+        # result = pd.DataFrame.from_dict(result, orient='index')
+        # result.columns = ['std']
         initial_n_features = dataset_matrix.shape[1]
         final_n_features = len(best_features)
 

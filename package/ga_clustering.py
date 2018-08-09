@@ -13,7 +13,8 @@ from deap import creator, tools, base, algorithms
 from scipy.spatial import distance
 from tqdm import tqdm
 
-from package.evaluation_functions import ALLOWED_FITNESSES, eval_features, evaluate, evaluate_rate_metrics
+from package.evaluation_functions import ALLOWED_FITNESSES, eval_features, evaluate, evaluate_rate_metrics, \
+    custom_distance
 
 
 def force_bounds(minimum, maximum, individual):
@@ -96,13 +97,14 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
     def fit(self, X, y=None):
         population_rate = math.ceil(self.pop_eval_rate * self.pop_size)
 
-        samples_dist_matrix = distance.squareform(distance.pdist(X))
+        # samples_dist_matrix = distance.squareform(distance.pdist(X))
+        samples_dist_matrix = custom_distance(X)
 
         setup_creator(self.fitness_metric)
         toolbox = setup_toolbox(X.shape, self.min_features, self.max_features)
         toolbox.register("evaluate", eval_features, X, self.algorithm, self.fitness_metric, samples_dist_matrix)
 
-        pool = Pool(processes=cpu_count()-1, initializer=setup_creator, initargs=[self.fitness_metric])
+        pool = Pool(processes=cpu_count(), initializer=setup_creator, initargs=[self.fitness_metric])
         toolbox.register("map", pool.map)
 
         population = toolbox.population(n=self.pop_size)

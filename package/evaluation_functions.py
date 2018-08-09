@@ -1,5 +1,6 @@
 import numpy as np
 import rpy2
+from scipy.spatial import distance
 from sklearn.metrics import silhouette_samples, silhouette_score, accuracy_score, f1_score, adjusted_rand_score
 
 from rpy2.robjects import r
@@ -49,6 +50,41 @@ def eval_features(X, ac, metric, samples_dist_matrix, individual):
         index1 += 1
 
     return index1,
+
+
+def non_zero_and_dist(I, J):
+    non_zero_index = (np.nonzero(I) and np.nonzero(J))
+    return distance.cityblock(I[non_zero_index], J[non_zero_index])
+
+
+def non_zero_or_dist(I, J):
+    non_zero_index = (np.nonzero(I) or np.nonzero(J))
+    return distance.cityblock(I[non_zero_index], J[non_zero_index])
+
+
+def count_and_dist_similar(I, J):
+    non_zero_index = (np.nonzero(I) and np.nonzero(J))
+    return 1/(np.sum(non_zero_index) + 0.00001)
+
+
+def count_or_dist_similar(I, J):
+    non_zero_index = (np.nonzero(I) or np.nonzero(J))
+    return 1/(np.sum(non_zero_index) + 0.00001)
+
+
+def custom_distance(X):
+    """
+
+    :type X: np.ndarray
+    """
+    dataset_shape = X.shape
+
+    dist_matrix = np.zeros((dataset_shape[0], dataset_shape[0]))
+    for i in range(dataset_shape[0]):
+        for j in range(dataset_shape[0]):
+            dist_matrix[i, j] = count_or_dist_similar(X[i, :], X[j, :])
+
+    return dist_matrix
 
 
 def perfect_eval_features(X, y, ac, individual):

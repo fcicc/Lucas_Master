@@ -78,7 +78,7 @@ def run():
                 df_clone.rename({index: class_str + index}, inplace=True, axis='index')
             elif 'sorting' in index.lower():
                 df_clone.rename({index: 'sorting'}, inplace=True, axis='index')
-            elif '(mm)' in index.lower() and 'main' in index.lower():
+            elif '(mm)' in index.lower() and ('main' in index.lower() or 'principal' in index.lower()):
                 df_clone.rename({index: 'grain_size'}, inplace=True, axis='index')
             elif index.lower() == 'porosity':
                 df_clone.rename({index: 'porosity'}, inplace=True, axis='index')
