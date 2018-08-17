@@ -120,6 +120,19 @@ def calculate_subtotals(target_path, idiom):
         print(result_dataset.isna().any())
         raise ValueError('There should not be any NaN values inside the subtotals data frame!')
 
+    # ==================================================================================================================
+    # OTHER SUBTOTALS
+    compositional_types = ['porosity', 'primary', 'diagenetic']
+
+    for compositional_type in compositional_types:
+        for macro_location in MACRO_LOCATIONS:
+            result_dataset[f'[{macro_location}-{compositional_type}-subtotal]'] =\
+                dataset.filter(regex=f'^\[{compositional_type}.*{macro_location}[^-]*$').sum(axis=1)
+
+    result_dataset['[framework-subtotal]'] = dataset.filter(regex='.*framework[^-]*$').sum(axis=1)
+    result_dataset['[interstitial-subtotal]'] = dataset.filter(regex='.*interstitial[^-]*$').sum(axis=1)
+    # ==================================================================================================================
+
     result_dataset['petrofacie'] = dataset['petrofacie']
     result_dataset['grain_size'] = dataset['porosity']
     result_dataset['phi stdev sorting'] = dataset['phi stdev sorting']
