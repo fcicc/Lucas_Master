@@ -2,6 +2,7 @@ import argparse
 import csv
 import glob
 import os
+from collections import Iterable
 from typing import List
 
 import lasio
@@ -104,7 +105,10 @@ def plot_correlation(db_file, axis1, axis2, color, id=None, exp_name=None):
             if len(results) == 0:
                 raise ValueError(f'No results found with name {exp_name}')
 
-            individual_evaluations = pd.concat([result.individual_evaluations for result in results])
+            if len(results) == 1:
+                individual_evaluations = results[0].individual_evaluations
+            else:
+                individual_evaluations = pd.concat([result.individual_evaluations for result in results])
 
         except OperationalError:
             print(f'No results found with id {id}')
@@ -120,6 +124,10 @@ def plot_correlation(db_file, axis1, axis2, color, id=None, exp_name=None):
             print(f'No results found with name {exp_name}')
 
     df = individual_evaluations
+
+    if type(df) == str:
+        return
+
     df.sort_values(by='generation', ascending=True)
     # df = df.sample(frac=1 / len(results))
 

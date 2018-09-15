@@ -1,29 +1,24 @@
-import copy
-
-import pandas as pd
-import rpy2
-
-from package.coclustering import CoClustering
-# from package.preprocessing import binaryze_column, range_grain_size
-from package.evaluation_functions import custom_distance
-from package.pso_clustering import PSOClustering
-from sklearn import cluster
-from sklearn.metrics import confusion_matrix, silhouette_score, adjusted_rand_score, \
-    accuracy_score, f1_score
-
 import argparse
 import datetime
 import warnings
 
+import numpy as np
+import pandas as pd
+import rpy2
 from rpy2.rinterface import RRuntimeWarning
+from sklearn import cluster
+from sklearn.metrics import confusion_matrix, silhouette_score, adjusted_rand_score, \
+    accuracy_score, f1_score
+from sklearn.utils.multiclass import unique_labels
 from tqdm import tqdm
 
-from sklearn.utils.multiclass import unique_labels
-
-from package.utils import class_cluster_match
+from package.coclustering import CoClustering
 from package.ga_clustering import ALLOWED_FITNESSES, GAClustering
 from package.orm_interface import store_results
 from package.orm_models import create_if_not_exists
+from package.pso_clustering import PSOClustering
+from package.utils import class_cluster_match
+from package.ward_p import WardP
 
 warnings.filterwarnings("ignore", category=RRuntimeWarning)
 
@@ -61,9 +56,12 @@ def argument_parser(args) -> argparse.Namespace:
     parser.add_argument('-o', '--db-file', type=str, default='./local.db',
                         help='sqlite file to store results')
     parser.add_argument('-s', '--strategy', type=str, default='ga',
-                        help='ga(Genetic Algorithm) or PSO (Particle Swarm Optimization)', choices=['ga', 'pso'])
+                        help='ga(Genetic Algorithm) or PSO (Particle Swarm Optimization)', choices=['ga', 'pso',
+                                                                                                    'ward_p'])
     parser.add_argument('-n', '--run-multiple', type=int, default=1,
                         help='number of multiple runs')
+    parser.add_argument('--p_ward', type=float, default=2,
+                        help='Ward P exponential value')
 
     args = parser.parse_args(args=args)
 
@@ -82,8 +80,8 @@ def run(args=None):
     df = pd.read_csv(args.input_file, index_col=0, header=0)
 
     del df['grain_size']
-    del df['sorting']
-    del df['Phi stdev sorting']
+    # del df['sorting']
+    del df['phi stdev sorting']
 
     # if args.beta > 1:
     #     df = upscale_grain_size(df, args.beta)
@@ -99,8 +97,8 @@ def run(args=None):
     ac = None
     if args.cluster_algorithm == 'agglomerative':
         ac = cluster.AgglomerativeClustering(n_clusters=len(unique_labels(y)),
-                                             affinity=custom_distance,
-                                             linkage='complete')
+                                             # affinity=custom_distance,
+                                             linkage='ward')
     elif args.cluster_algorithm == 'kmeans':
         ac = cluster.KMeans(n_clusters=len(unique_labels(y)), n_init=100)
 
@@ -123,6 +121,12 @@ def run(args=None):
             strategy_clustering = CoClustering(algorithm=ac, n_generations=args.num_gen, perfect=args.perfect,
                                                fitness_metric=args.fitness_metric, pop_size=args.pop_size,
                                                pop_eval_rate=args.eval_rate)
+        elif args.strategy == 'ward_p':
+            kernel_feature = df['porosity'].values
+            np.delete(dataset_matrix, df.columns.get_loc('porosity'))
+            del df['porosity']
+            strategy_clustering = WardP(perfect=args.perfect, kernel_feature=kernel_feature, p=args.p_ward,
+                                        n_clusters=len(unique_labels(y)))
 
         start_time = datetime.datetime.now()
         if args.eval_rate:
@@ -135,10 +139,14 @@ def run(args=None):
             best_weights = strategy_clustering.global_best_
             best_prediction = ac.fit(dataset.values*best_weights).labels_
             best_features = dataset.columns.values
-        else:
+        elif args.strategy == 'ga':
             best_features = [col for col, boolean in zip(dataset.columns.values, strategy_clustering.global_best_)
                              if boolean]
             best_prediction = ac.fit(dataset[best_features]).labels_
+        elif args.strategy == 'ward_p':
+            best_features = dataset.columns.values
+            best_prediction = strategy_clustering.labels_
+            strategy_clustering.metrics_ = ''
 
         # std_variances = dataset.std(axis=0)
         # result = {

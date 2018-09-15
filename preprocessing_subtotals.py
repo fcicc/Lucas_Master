@@ -134,7 +134,8 @@ def calculate_subtotals(target_path, idiom):
     # ==================================================================================================================
 
     result_dataset['petrofacie'] = dataset['petrofacie']
-    result_dataset['grain_size'] = dataset['porosity']
+    result_dataset['porosity'] = dataset['porosity']
+    result_dataset['grain_size'] = dataset['grain_size']
     result_dataset['phi stdev sorting'] = dataset['phi stdev sorting']
 
     return result_dataset

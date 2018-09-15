@@ -34,6 +34,7 @@ def run():
         if isfile(join(args.input_folder, file_name))
         and file_name.endswith('.csv')
         and file_name != 'dataset.csv'
+        and file_name != args.output_file
     ]
     print('DONE')
 
@@ -125,7 +126,7 @@ def run():
             return 0
 
     if 'sorting' in full_csv.columns.values:
-        full_csv['Phi stdev sorting'] = full_csv['sorting'].map(phi_translate)
+        full_csv['phi stdev sorting'] = full_csv['sorting'].map(phi_translate)
 
     cols = list(full_csv.columns.values)
     cols.remove('petrofacie')

@@ -68,7 +68,7 @@ def range_grain_size(df: pd.DataFrame):
 
     :type df: pd.DataFrame
     """
-    df['Minimum grain size'] = (df['Main/single size mode(mm):'] - df['Phi stdev sorting']) * 100
-    df['Maximum'] = (df['Main/single size mode(mm):'] + df['Phi stdev sorting']) * 100
+    df['Minimum grain size'] = (df['Main/single size mode(mm):'] - df['phi stdev sorting']) * 100
+    df['Maximum'] = (df['Main/single size mode(mm):'] + df['phi stdev sorting']) * 100
 
     return df

@@ -19,6 +19,7 @@ class MainTest(unittest.TestCase):
 
     def test_ga(self):
         for dataset in self.testing_datasets:
+            print(dataset)
             args = self.args + [
                 dataset, self.exp_name
             ]

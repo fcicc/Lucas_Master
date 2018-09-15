@@ -82,7 +82,7 @@ def custom_distance(X):
     dist_matrix = np.zeros((dataset_shape[0], dataset_shape[0]))
     for i in range(dataset_shape[0]):
         for j in range(dataset_shape[0]):
-            dist_matrix[i, j] = count_or_dist_similar(X[i, :], X[j, :])
+            dist_matrix[i, j] = non_zero_and_dist(X[i, :], X[j, :])
 
     return dist_matrix
 
