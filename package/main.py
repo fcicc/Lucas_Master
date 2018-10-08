@@ -79,9 +79,11 @@ def run(args=None):
 
     df = pd.read_csv(args.input_file, index_col=0, header=0)
 
-    del df['grain_size']
+    if 'grain_size' in df.columns:
+        del df['grain_size']
     # del df['sorting']
-    del df['phi stdev sorting']
+    if 'phi stdev sorting' in df.columns:
+        del df['phi stdev sorting']
 
     # if args.beta > 1:
     #     df = upscale_grain_size(df, args.beta)
