@@ -5,7 +5,7 @@ from glob import glob
 
 import pandas as pd
 
-MACRO_LOCATIONS = ['interstitial', 'framework', 'framework and interstitial']
+MACRO_LOCATIONS = ['intersticial', 'arcabouço', 'arcabouço e intersticial']
 
 
 def calculate_subtotals(target_path, idiom):
@@ -143,7 +143,8 @@ def calculate_subtotals(target_path, idiom):
 
 if __name__ == '__main__':
     idiom = 'PTBR'
-    target_paths = glob('datasets/*/dataset.csv')
+    # target_paths = glob('datasets/*/dataset.csv')
+    target_paths = ['dataset_julia.csv']
 
     for target_path in target_paths:
         print(f'processing {target_path}')

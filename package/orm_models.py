@@ -61,7 +61,7 @@ class ConfusionMatrix(Base):
 
     def as_dataframe(self) -> pd.DataFrame:
         labels = sorted(self.confusion_matrix_labels, key=lambda x: x.row_column)
-        labels = [label.label for label in labels]
+        labels = [label.label.replace(' (Sealed)', '') for label in labels]
 
         matrix_dim = len(labels)
         matrix = np.zeros((matrix_dim, matrix_dim))

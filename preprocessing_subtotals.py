@@ -1,152 +1,125 @@
 import re
 from copy import deepcopy
+from functools import partial
 from os.path import join, dirname
 from glob import glob
 
 import pandas as pd
+from owlready2 import get_ontology
 
 MACRO_LOCATIONS = ['interstitial', 'framework', 'framework and interstitial']
 
 
 def calculate_subtotals(target_path, idiom):
-    dataset = pd.read_csv(target_path, delimiter=',', index_col=0)
+    dataset = pd.read_excel(target_path, index_row=[0, 1, 2], header=[0, 1, 2]).groupby(level=['features'], axis=1).sum()
+
+    petr_ont = get_ontology('petroledge_model.owl').load()
 
     feature_names = list(map(lambda x: x.lower(), dataset.columns.values))
     feature_names = [re.sub('(\[.*\])', '', feature_name) for feature_name in feature_names]
 
     dataset.columns = feature_names
 
-    result_dataset = pd.DataFrame(index=dataset.index)
+    others_names = list(set(feature_names) & {'grain_size', 'petrofacie', 'phi stdev sorting', 'sorting'})
 
-    def extract_compositional_type(s):
-        n_attributes = s.count(' - ') + 1
-        if n_attributes == 3:
-            return 'primary'
-        elif n_attributes == 7:
-            return 'diagenetic'
-        elif n_attributes == 6:
-            return 'porosity'
-        else:
-            return ''
+    others = dataset[others_names]
+    if 'sorting' in others_names:
+        del others['sorting']
+    dataset = dataset.drop(others_names, axis=1)
 
-    compositional_types = [extract_compositional_type(feature_name) for feature_name in feature_names]
+    compositional_type = [partial(extract_mineral_group, petr_ont)(column) for column in dataset.columns]
 
-    # ==================================================================================================================
-    # PRIMARY SUBTOTALS
-    primary_attributes_names = ['constituent', 'location', 'modification']
-    primary_attributes = [feature_name.split(' - ') for feature_name, compositional_type
-                          in zip(feature_names, compositional_types)
-                          if compositional_type == 'primary']
-    primary_attributes = pd.DataFrame(primary_attributes, columns=primary_attributes_names)
-    grouped_primary_attributes = primary_attributes.groupby(['constituent', 'location'])
-    for name, group in grouped_primary_attributes:
-        group_name = ' - '.join(name)
-        result_dataset['[primary-subtotal]'+group_name+' - framework'] = dataset.filter(regex=f'{group_name}.*-[^-]*').sum(axis=1)
-    # ==================================================================================================================
+    locational_groups = [extract_locational_group(petr_ont, column) for column in dataset.columns]
 
-    # ==================================================================================================================
-    # DIAGENETIC SUBTOTALS
-    diagenese_mapping = pd.read_excel(
-        './subtotals_instructive_tables/Categorias de Localização Diagenética revDeRos.xlsx')
-    diagenese_mapping = diagenese_mapping.apply(lambda x: x.astype(str).str.lower())
+    main_groups = ['compositional_groups' for _ in dataset.columns]
+    main_groups += ['localizational_groups' for _ in dataset.columns]
 
-    diagenetic_attributes_names = ['consituent', 'habit', 'location', 'modification', 'paragenetic relation',
-                                   'paragenetic relation constituents', 'paragenetic relation constituent location']
-    diagenetic_attributes = [feature_name.split(' - ') for feature_name, compositional_type
-                             in zip(feature_names, compositional_types)
-                             if compositional_type == 'diagenetic']
-    diagenetic_attributes = pd.DataFrame(diagenetic_attributes, columns=diagenetic_attributes_names)
+    dataset = pd.concat([dataset, dataset], axis=1)
+    dataset.columns = pd.MultiIndex.from_tuples(zip(main_groups, compositional_type+locational_groups, dataset.columns.values))
+    dataset.columns.names = ['groups_types', 'features_groups', 'features']
 
-    for feature in diagenetic_attributes.iterrows():
-        feature_name = feature[1]
-        feature_values = dataset[' - '.join(feature_name)]
-        if feature_name['location'] == '' and feature_name['paragenetic relation constituent location'] == '':
-            raise ValueError(f'Line:\n{" - ".join(feature_name)} is not complete enough on file {target_path}.'
-                             f'At least its LOCATION or PARAGENETIC RELATION CONSTITUENT LOCATION have to be filled'
-                             f'properly.')
-        if feature_name['paragenetic relation constituent location'] in MACRO_LOCATIONS:
-            subtotal_feature_name = deepcopy(feature_name)
-            subtotal_feature_name['macro location'] = query['location'].values[0]
-            del subtotal_feature_name['paragenetic relation constituent location']
-            subtotal_feature_name = '[diagenetic-subtotal]' + ' - '.join(subtotal_feature_name)
-            if subtotal_feature_name not in result_dataset:
-                result_dataset[subtotal_feature_name] = \
-                    pd.Series([0] * result_dataset.shape[0], index=result_dataset.index)
-            result_dataset[subtotal_feature_name] += feature_values
-        else:
-            query = diagenese_mapping[diagenese_mapping['VALUE_' + idiom] == feature_name['paragenetic relation' \
-                                                                                          ' constituent location']]
-            if query.empty:
-                query = diagenese_mapping[diagenese_mapping['VALUE_' + idiom] == feature_name['location']]
-                if query.empty:
-                    raise ValueError(f'Could not define macro location for {" - ".join(feature_name)} in file'
-                                     f'{target_path}')
-                else:
-                    subtotal_feature_name = deepcopy(feature_name)
-                    subtotal_feature_name['macro location'] = query['location'].values[0]
-                    del subtotal_feature_name['location']
-                    subtotal_feature_name = '[diagenetic-subtotal]'+' - '.join(subtotal_feature_name)
-                    if subtotal_feature_name not in result_dataset:
-                        result_dataset[subtotal_feature_name] = \
-                            pd.Series([0] * result_dataset.shape[0], index=result_dataset.index)
-                    result_dataset[subtotal_feature_name] += feature_values
-            else:
-                subtotal_feature_name = deepcopy(feature_name)
-                subtotal_feature_name['macro location'] = query['location'].values[0]
-                del subtotal_feature_name['paragenetic relation constituent location']
-                subtotal_feature_name = '[diagenetic-subtotal]'+' - '.join(subtotal_feature_name)
-                if subtotal_feature_name not in result_dataset:
-                    result_dataset[subtotal_feature_name] = \
-                        pd.Series([0] * result_dataset.shape[0], index=result_dataset.index)
-                result_dataset[subtotal_feature_name] += feature_values
-    # ==================================================================================================================
+    others.columns = pd.MultiIndex.from_tuples(zip(others.columns.values, others.columns.values, others.columns.values))
+    dataset = pd.concat([dataset, others], axis=1)
 
-    # ==================================================================================================================
-    # POROSITY SUBTOTALS
-    porosity_attributes_names = ['porosity', 'location', 'modification', 'paragenetic relation',
-                                 'paragenetic relation constituents',
-                                 'paragenetic relation constituent location']
-    porosity_attributes = [feature_name.split(' - ') for feature_name, compositional_type
-                           in zip(feature_names, compositional_types)
-                           if compositional_type == 'porosity']
-    porosity_attributes = pd.DataFrame(porosity_attributes, columns=porosity_attributes_names)
-    grouped_primary_attributes = porosity_attributes.groupby(['porosity', 'location'])
-    for name, group in grouped_primary_attributes:
-        group_name = ' - '.join(list(name))
-        result_dataset['[porosity-subtotal]'+group_name] = dataset.filter(regex=f'^{group_name}.*-.*-.*-.*-[^-]*').sum(axis=1)
-    # ==================================================================================================================
+    dataset.index.name = 'sample'
+    dataset = dataset.sort_index(axis=1)
 
-    if any(result_dataset.isna().any().values):
-        print(result_dataset.isna().any())
+    if any(dataset.isna().any().values):
+        print(dataset.isna().any())
         raise ValueError('There should not be any NaN values inside the subtotals data frame!')
 
-    # ==================================================================================================================
-    # OTHER SUBTOTALS
-    compositional_types = ['porosity', 'primary', 'diagenetic']
+        dataset['petrofacie'] = dataset['petrofacie']
+    return dataset
 
-    for compositional_type in compositional_types:
-        for macro_location in MACRO_LOCATIONS:
-            result_dataset[f'[{macro_location}-{compositional_type}-subtotal]'] =\
-                dataset.filter(regex=f'^\[{compositional_type}.*{macro_location}[^-]*$').sum(axis=1)
 
-    result_dataset['[framework-subtotal]'] = dataset.filter(regex='.*framework[^-]*$').sum(axis=1)
-    result_dataset['[interstitial-subtotal]'] = dataset.filter(regex='.*interstitial[^-]*$').sum(axis=1)
-    # ==================================================================================================================
+def extract_compositional_type(column):
+    if column.count(' - ') == 2:
+        return 'primary'
+    elif column.count(' - ') == 6:
+        return 'diagenetic'
+    elif column.count(' - ') == 5:
+        return 'porosity'
+    else:
+        return column
 
-    result_dataset['petrofacie'] = dataset['petrofacie']
-    result_dataset['porosity'] = dataset['porosity']
-    result_dataset['grain_size'] = dataset['grain_size']
-    result_dataset['phi stdev sorting'] = dataset['phi stdev sorting']
 
-    return result_dataset
+def extract_mineral_group(ontology, column):
+    if column.count(' - ') < 2:
+        return column
+
+    constituent = column.split(' - ')[0].replace(' ', '_')
+
+    return ontology[constituent].is_a[0].name
+
+
+def extract_locational_group(ontology, column):
+    attributes = column.split(' - ')
+    attributes = [attribute.replace(' ', '_') for attribute in attributes]
+    n_attributes = column.count(' - ')
+
+    if n_attributes == 2:
+        location = attributes[1]
+    elif n_attributes == 6:
+        location = attributes[2]
+    elif n_attributes == 5:
+        location = attributes[1]
+    else:
+        return column
+
+    location_group = ontology.search_one(is_a=ontology['location'], iri=f'*{location}')
+    if location_group is None:
+        if n_attributes == 2:
+            print('Primary')
+        elif n_attributes == 6:
+            print('Diagenetic')
+        elif n_attributes == 5:
+            print('Porosity')
+        print(f'{location} NOT FOUND IN THE ONTOLOGY')
+        return location
+    parent_group = location_group.is_a[0]
+    non_able_parents = [ontology[loc] for loc in ['location', 'diagenetic_location', 'porosity_location', 'primary_location']]
+    if parent_group not in non_able_parents:
+        location_group = parent_group
+
+    return location_group.name
 
 
 if __name__ == '__main__':
     idiom = 'ENUS'
-    target_paths = glob('datasets/*/dataset.csv')
+    target_paths = glob('datasets/*/dataset.xlsx')
+    target_pats = ['']
 
     for target_path in target_paths:
+        if 'talara' in target_path.lower():
+            continue
         print(f'processing {target_path}')
+        # try:
         subtotals_df = calculate_subtotals(target_path, idiom)
-        subtotals_df.to_csv(join(dirname(target_path), 'subtotals_dataset.csv'))
-        print('DONE')
+        target_save_path = join(dirname(target_path), 'subtotals_dataset.xlsx')
+        print(f'saving results to {target_save_path}')
+        subtotals_df.to_excel(target_save_path)
+        # except AttributeError as e:
+        #     print(e)
+        #     print(f'ERROR PROCESSING {target_path}!')
+
+    print('Done')

@@ -22,7 +22,7 @@ def update_all_distances(cluster_centers, W, p, Nk, all_distances, k1_min, k2_mi
     return all_distances
 
 
-def get_new_W(Data, W, U, cluster_centers, K, M, p):
+def get_new_W(Data, W, U, cluster_centers, K, M, p, kernel_feature):
     # D = np.zeros((K, M))
     # for l in range(K):
     #     for j in range(M):
@@ -44,6 +44,10 @@ def get_new_W(Data, W, U, cluster_centers, K, M, p):
     #
     # return W
 
+    epsilon = 1e-5
+    for l in range(K):
+        for j in range(M):
+            W[l, j] = 1 / (np.std(Data[U==l, j]))
 
 
 def merge(k1_min, k2_min, U, Data, Nk, M, cluster_centers, p, K):

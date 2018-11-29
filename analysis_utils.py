@@ -3,6 +3,7 @@ import csv
 import glob
 import os
 from collections import Iterable
+from itertools import groupby
 from typing import List
 
 import lasio
@@ -45,6 +46,7 @@ def argument_parser(args) -> argparse.Namespace:
     parser.add_argument('--select-best', action='store_true')
     parser.add_argument('--logs-folder', type=str, default=None)
     parser.add_argument('--plot-logs', action='store_true')
+    parser.add_argument('--export-results', action='store_true')
 
     args = parser.parse_args(args=args)
 
@@ -54,7 +56,7 @@ def argument_parser(args) -> argparse.Namespace:
             args.average_feature_selection, args.list_results,
             args.detail_result, args.confusion_matrix,
             args.filter, args.select_best,
-            args.plot_logs]) != 1:
+            args.plot_logs, args.export_results]) != 1:
         raise ValueError("Cannot have this combination of arguments.")
 
     return args
@@ -300,12 +302,12 @@ def filter_dataset(args):
     session = local_create_session(args.db_file)
 
     columns = []
-    try:
-        result = session.query(Result).filter(Result.id == args.id).first()
-        columns = [selected_feature.column for selected_feature in result.selected_features]
-        labels = [int(result_label.label) for result_label in result.result_labels]
-    except AttributeError:
-        raise ValueError(f'Result {args.id} not found in {args.db_file}')
+    # try:
+    result = session.query(Result).filter(Result.id == args.id[0]).first()
+    columns = [selected_feature.column for selected_feature in result.selected_features]
+    labels = [int(result_label.label) for result_label in result.result_labels]
+    # except AttributeError:
+    #     raise ValueError(f'Result {str(args.id)} not found in {args.db_file}')
 
     session.close()
 
@@ -340,6 +342,46 @@ def select_best(args):
     session.close()
 
 
+def export_results(args):
+    databases = glob.glob('./*.db')
+
+    dbs = []
+    experiment_names = []
+    results_table = []
+    for db in databases:
+        session = local_create_session(db)
+
+        results: List[Result] = session.query(Result).all()
+        group_results = groupby(results, key=lambda x: list(map(str, x.args)))
+
+        for key, group in group_results:
+            experiment_name = ''
+            results = list(group)
+            for arg in key:
+                if str(arg).startswith('experiment_name'):
+                    experiment_name = str(arg)[17:]
+
+            accuracies = []
+            aris = []
+            f_measures = []
+            for result in results:
+                accuracies += [result.accuracy]
+                aris += [result.adjusted_rand_score]
+                f_measures += [result.f_measure]
+
+            dbs += [db]
+            experiment_names += [experiment_name]
+            results_table += [
+                [f'{np.average(accuracies)} ± {np.std(accuracies)}', f'{np.average(aris)} ± {np.std(aris)}',
+                 f'{np.average(f_measures)} ± {np.std(f_measures)}']]
+
+        session.close()
+
+    results_index = pd.MultiIndex.from_arrays([dbs, experiment_names])
+    results_table = pd.DataFrame(results_table, index=results_index, columns=['Accuracy', 'ARI', 'F-Measure']).transpose()
+    results_table.to_excel('results_summary.xlsx')
+
+
 def main(args=None):
     args = argument_parser(args)
 
@@ -370,6 +412,8 @@ def main(args=None):
         select_best(args)
     elif args.plot_logs:
         plot_logs(args)
+    elif args.export_results:
+        export_results(args)
 
     return result
 

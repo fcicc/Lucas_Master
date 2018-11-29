@@ -50,7 +50,8 @@ def argument_parser(args) -> argparse.Namespace:
     parser.add_argument('--fitness-metric', type=str, default='silhouette_sklearn',
                         help='fitness function to be used', choices=[fitnes_str for fitnes_str, _ in ALLOWED_FITNESSES])
     parser.add_argument('--cluster-algorithm', type=str, default='agglomerative',
-                        help='cluster algorithm to be used', choices=['agglomerative', 'kmeans'])
+                        help='cluster algorithm to be used', choices=['agglomerative', 'kmeans',
+                                                                      'affinity-propagation'])
     parser.add_argument('-d', '--dont-use-ga', action='store_true',
                         help='disables the use of GA and apply cluster to all dimensions')
     parser.add_argument('-o', '--db-file', type=str, default='./local.db',
@@ -77,7 +78,7 @@ def run(args=None):
 
     create_if_not_exists(args.db_file)
 
-    df = pd.read_csv(args.input_file, index_col=0, header=0)
+    df = pd.read_excel(args.input_file, index_row=[0, 1, 2], header=[0, 1, 2]).groupby(level=['features_groups'], axis=1).sum()
 
     if 'grain_size' in df.columns:
         del df['grain_size']
@@ -96,19 +97,22 @@ def run(args=None):
     dataset = dataset.reset_index(drop=True)
     dataset_matrix = dataset.values
 
-    ac = None
-    if args.cluster_algorithm == 'agglomerative':
-        ac = cluster.AgglomerativeClustering(n_clusters=len(unique_labels(y)),
-                                             # affinity=custom_distance,
-                                             linkage='ward')
-    elif args.cluster_algorithm == 'kmeans':
-        ac = cluster.KMeans(n_clusters=len(unique_labels(y)), n_init=100)
-
-    if len(unique_labels(y)) > args.min_features:
-        args.min_features = len(unique_labels(y))
-
     results_ids = []
     for _ in tqdm(range(args.run_multiple)):
+
+        ac = None
+        if args.cluster_algorithm == 'agglomerative':
+            ac = cluster.AgglomerativeClustering(n_clusters=len(unique_labels(y)),
+                                                 # affinity=custom_distance,
+                                                 linkage='ward')
+        elif args.cluster_algorithm == 'kmeans':
+            ac = cluster.KMeans(n_clusters=len(unique_labels(y)), n_init=10)
+        elif args.cluster_algorithm == 'affinity-propagation':
+            ac = cluster.AffinityPropagation(preference=-250)
+
+        if len(unique_labels(y)) > args.min_features:
+            args.min_features = len(unique_labels(y))
+
         strategy_clustering = None
         if args.strategy == 'ga':
             strategy_clustering = GAClustering(algorithm=ac, n_generations=args.num_gen, perfect=args.perfect,
@@ -130,6 +134,9 @@ def run(args=None):
             strategy_clustering = WardP(perfect=args.perfect, kernel_feature=kernel_feature, p=args.p_ward,
                                         n_clusters=len(unique_labels(y)))
 
+        if args.dont_use_ga:
+            strategy_clustering = ac
+
         start_time = datetime.datetime.now()
         if args.eval_rate:
             strategy_clustering.fit(dataset_matrix, y=y)
@@ -137,7 +144,14 @@ def run(args=None):
             strategy_clustering.fit(dataset_matrix)
         end_time = datetime.datetime.now()
 
-        if args.strategy == 'pso':
+        if type(ac) == cluster.KMeans:
+            ac = cluster.KMeans(n_clusters=len(unique_labels(y)), n_init=100)
+
+        if args.dont_use_ga:
+            best_features = dataset.columns.values
+            best_prediction = strategy_clustering.labels_
+            strategy_clustering.metrics_ = ''
+        elif args.strategy == 'pso':
             best_weights = strategy_clustering.global_best_
             best_prediction = ac.fit(dataset.values*best_weights).labels_
             best_features = dataset.columns.values
@@ -160,8 +174,7 @@ def run(args=None):
 
         y_prediction = class_cluster_match(y, best_prediction)
         cm = confusion_matrix(y, y_prediction)
-        cm = pd.DataFrame(data=cm, index=unique_labels(y),
-                          columns=unique_labels(best_prediction))
+        cm = pd.DataFrame(data=cm, index=unique_labels(y), columns=unique_labels(best_prediction))
 
         accuracy = accuracy_score(y, y_prediction)
         f_measure = f1_score(y, y_prediction, average='weighted')

@@ -2,6 +2,8 @@ import argparse
 import copy
 import csv
 import os
+from glob import glob
+
 import numpy as np
 from functools import partial
 from os.path import isfile, join
@@ -25,6 +27,16 @@ def argument_parser() -> argparse.Namespace:
     return args
 
 
+def map_attribute_name(old_name):
+    new_name = old_name.lower()
+    df = pd.read_excel('mapping_old_attribute_names.xlsx')
+    for index, row in df.iterrows():
+        splitted_attribute = new_name.split(' - ')
+        if row['old_name'] in splitted_attribute:
+            new_name = new_name.replace(row['old_name'], row['new_name'])
+    return new_name
+
+
 def run():
     args = argument_parser()
 
@@ -33,31 +45,33 @@ def run():
         file_name for file_name in os.listdir(args.input_folder)
         if isfile(join(args.input_folder, file_name))
         and file_name.endswith('.csv')
-        and file_name != 'dataset.csv'
+        and 'dataset' not in file_name
         and file_name != args.output_file
     ]
     print('DONE')
 
     print('READING THIN SECTION FILES')
     csv_data_files = [
-        pd.read_csv(open(join(args.input_folder, csv_file_name)), index_col=0)
+        pd.read_csv(open(join(args.input_folder, csv_file_name)), index_col=0, encoding='utf-8')
         for csv_file_name in csv_file_names]
     dfs = []
     for csv_file in csv_data_files:
         df = csv_file.applymap(partial(pd.to_numeric, errors='ignore'))
+        df.index = csv_file.index.map(map_attribute_name)
+        # df.drop('', axis='columns', )
         dfs.append(df)
     csv_data_files = dfs
 
     print('DONE')
 
-    print('DUPLICATES:')
+    # print('DUPLICATES:')
     df_list = []
     for df, file_name in zip(csv_data_files, csv_file_names):
-        print(file_name)
+        # print(file_name)
         for index in df.index.values:
             if df.index.values.tolist().count(index) > 1:
                 df_list.append(index)
-                print('\t' + str(index))
+                # print('\t' + str(index))
 
     print('Removing rows:')
     csv_data_files_filtered = []
@@ -94,13 +108,17 @@ def run():
 
     csv_data_files = [df.dropna(axis=0, how='all') for df in csv_data_files]
 
-    csv_data_files = [df.groupby(df.index).sum() for df in csv_data_files]
+    csv_data_files = [df.groupby(df.index, axis=0).sum(axis=0) for df in csv_data_files]
 
-    print(sum(df.shape[0] for df in csv_data_files))
-    print(sum(df.shape[1] for df in csv_data_files))
+    # print(sum(df.shape[0] for df in csv_data_files))
+    # print(sum(df.shape[1] for df in csv_data_files))
     print('MERGING DATA')
 
     full_csv = pd.concat(csv_data_files, axis=1, sort=False)
+
+    full_csv = full_csv[full_csv.columns.drop(list(full_csv.filter(regex='Unnamed*')))]
+    if 'petrofacie' in full_csv.columns.values:
+        full_csv = full_csv.dropna(subset=['petrofacie'], axis=1)
     full_csv = full_csv.fillna(value=0)
 
     full_csv: pd.DataFrame = full_csv.transpose()
@@ -129,12 +147,21 @@ def run():
         full_csv['phi stdev sorting'] = full_csv['sorting'].map(phi_translate)
 
     cols = list(full_csv.columns.values)
-    cols.remove('petrofacie')
-    cols += ['petrofacie']
     full_csv = full_csv[cols]
+    full_csv = full_csv.loc[:, (full_csv != 0).any(axis=0)]
 
-    full_csv.to_csv(args.output_file, encoding='utf-8', quoting=csv.QUOTE_NONNUMERIC,
-                    float_format='%.10f')
+    columns = pd.MultiIndex.from_arrays([['raw' for _ in full_csv.columns.values], full_csv.columns.values, full_csv.columns.values],
+                                        names=['top_level', 'features_groups', 'features'])
+    full_csv.columns = columns
+    full_csv.index.name = 'samples'
+
+    try:
+        drop_indexes = [row for row, val in zip(full_csv.index, np.sum(full_csv.values, axis=1)) if val < 95]
+        full_csv.drop(drop_indexes, axis=0, inplace=True)
+    except TypeError as e:
+        pass
+
+    full_csv.to_excel(args.output_file)
 
     print('DONE!')
 
