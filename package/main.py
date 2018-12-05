@@ -63,6 +63,7 @@ def argument_parser(args) -> argparse.Namespace:
                         help='number of multiple runs')
     parser.add_argument('--p_ward', type=float, default=2,
                         help='Ward P exponential value')
+    parser.add_argument('--scenario', nargs='+', help='List of scenarios of features to be used', required=True)
 
     args = parser.parse_args(args=args)
 
@@ -78,7 +79,9 @@ def run(args=None):
 
     create_if_not_exists(args.db_file)
 
-    df = pd.read_excel(args.input_file, index_row=[0, 1, 2], header=[0, 1, 2]).groupby(level=['features_groups'], axis=1).sum()
+    df = pd.read_excel(args.input_file, index_row=[0, 1, 2], header=[0, 1, 2])
+    df = df[args.scenario[0] + ['others']]
+    df = df.groupby(level=['features_groups'], axis=1).sum()
 
     if 'grain_size' in df.columns:
         del df['grain_size']
@@ -110,8 +113,8 @@ def run(args=None):
         elif args.cluster_algorithm == 'affinity-propagation':
             ac = cluster.AffinityPropagation(preference=-250)
 
-        if len(unique_labels(y)) > args.min_features:
-            args.min_features = len(unique_labels(y))
+        # if len(unique_labels(y)) > args.min_features:
+        #     args.min_features = len(unique_labels(y))
 
         strategy_clustering = None
         if args.strategy == 'ga':

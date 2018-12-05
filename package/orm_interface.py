@@ -44,7 +44,7 @@ def store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_fea
         arg_entry = Arg(
             result_id=result_entry.id,
             name=arg_name,
-            value=arg_val
+            value=str(arg_val)
         )
         args_entries.append(arg_entry)
     session.bulk_save_objects(args_entries)

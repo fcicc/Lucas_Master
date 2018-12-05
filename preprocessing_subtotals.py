@@ -12,6 +12,7 @@ MACRO_LOCATIONS = ['interstitial', 'framework', 'framework and interstitial']
 
 def calculate_subtotals(target_path, idiom):
     dataset = pd.read_excel(target_path, index_row=[0, 1, 2], header=[0, 1, 2]).groupby(level=['features'], axis=1).sum()
+    dataset_original = pd.read_excel(target_path, index_row=[0, 1, 2], header=[0, 1, 2])
 
     petr_ont = get_ontology('petroledge_model.owl').load()
 
@@ -20,12 +21,13 @@ def calculate_subtotals(target_path, idiom):
 
     dataset.columns = feature_names
 
-    others_names = list(set(feature_names) & {'grain_size', 'petrofacie', 'phi stdev sorting', 'sorting'})
+    others_names = list(set(feature_names) & {'grain_size', 'petrofacie', 'phi stdev sorting', 'sorting', 'porosity'})
 
     others = dataset[others_names]
     if 'sorting' in others_names:
         del others['sorting']
     dataset = dataset.drop(others_names, axis=1)
+    dataset_original = dataset_original.drop(others_names, level='features', axis=1)
 
     compositional_type = [partial(extract_mineral_group, petr_ont)(column) for column in dataset.columns]
 
@@ -38,11 +40,13 @@ def calculate_subtotals(target_path, idiom):
     dataset.columns = pd.MultiIndex.from_tuples(zip(main_groups, compositional_type+locational_groups, dataset.columns.values))
     dataset.columns.names = ['groups_types', 'features_groups', 'features']
 
-    others.columns = pd.MultiIndex.from_tuples(zip(others.columns.values, others.columns.values, others.columns.values))
-    dataset = pd.concat([dataset, others], axis=1)
+    others.columns = pd.MultiIndex.from_tuples(zip(['others']*len(others.columns), others.columns.values, others.columns.values))
+    dataset = pd.concat([dataset_original, dataset, others], axis=1)
 
     dataset.index.name = 'sample'
     dataset = dataset.sort_index(axis=1)
+
+    dataset = dataset.fillna(value=0)
 
     if any(dataset.isna().any().values):
         print(dataset.isna().any())
@@ -52,20 +56,9 @@ def calculate_subtotals(target_path, idiom):
     return dataset
 
 
-def extract_compositional_type(column):
-    if column.count(' - ') == 2:
-        return 'primary'
-    elif column.count(' - ') == 6:
-        return 'diagenetic'
-    elif column.count(' - ') == 5:
-        return 'porosity'
-    else:
-        return column
-
-
 def extract_mineral_group(ontology, column):
     if column.count(' - ') < 2:
-        return column
+        return 'others'
 
     constituent = column.split(' - ')[0].replace(' ', '_')
 
@@ -84,7 +77,7 @@ def extract_locational_group(ontology, column):
     elif n_attributes == 5:
         location = attributes[1]
     else:
-        return column
+        return 'others'
 
     location_group = ontology.search_one(is_a=ontology['location'], iri=f'*{location}')
     if location_group is None:
@@ -110,16 +103,10 @@ if __name__ == '__main__':
     target_pats = ['']
 
     for target_path in target_paths:
-        if 'talara' in target_path.lower():
-            continue
         print(f'processing {target_path}')
-        # try:
         subtotals_df = calculate_subtotals(target_path, idiom)
         target_save_path = join(dirname(target_path), 'subtotals_dataset.xlsx')
         print(f'saving results to {target_save_path}')
         subtotals_df.to_excel(target_save_path)
-        # except AttributeError as e:
-        #     print(e)
-        #     print(f'ERROR PROCESSING {target_path}!')
 
     print('Done')
