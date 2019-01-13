@@ -68,21 +68,23 @@ def hopkins_statistic(X, scenario, path, pool):
 
 def multiple_hopkins_statistic(X, pool):
     n = X.shape[0]
+    min_max = [(min(column), max(column)) for column in X.T]
     nbrs = NearestNeighbors(n_neighbors=2, algorithm='brute').fit(X)
     distances, indices = nbrs.kneighbors(X)
     I = [dist for dist in distances[:, 1]]
-    min_max = [(min(column), max(column)) for column in X.T]
-    As = pool.map(partial(calculate_A, I, X, min_max, nbrs, n), range(1024))
+    sum_square_I = sum([i ** 2 for i in I])
+
+    As = pool.map(partial(calculate_A, sum_square_I, min_max, nbrs, n), range(1024))
     return As
 
 
-def calculate_A(I, X, min_max, nbrs, n, _):
+def calculate_A(sum_square_I, min_max, nbrs, n, _):
     random_points = np.asarray([[uniform(minimum, maximum) for minimum, maximum in min_max] for _ in range(n)])
     distances, indices = nbrs.kneighbors(random_points)
 
     P = [dist for dist in distances[:, 0]]
 
-    A = sum([p ** 2 for p in P]) / sum([i ** 2 for i in I])
+    A = sum([p ** 2 for p in P]) / sum_square_I
 
     return A
 

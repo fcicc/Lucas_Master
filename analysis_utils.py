@@ -2,6 +2,7 @@ import argparse
 import csv
 import glob
 import os
+import re
 from collections import Iterable
 from itertools import groupby
 from typing import List
@@ -343,43 +344,68 @@ def select_best(args):
 
 
 def export_results(args):
-    databases = glob.glob('./*.db')
+    databases = glob.glob(args.db_file)
 
     dbs = []
-    experiment_names = []
-    results_table = []
+    datasets = []
+    scenarios = []
+    args_idx = []
+    metrics = []
     for db in databases:
+        print(f'Processing {db}...')
         session = local_create_session(db)
 
-        results: List[Result] = session.query(Result).all()
-        group_results = groupby(results, key=lambda x: list(map(str, x.args)))
+        query_results: List[Result] = session.query(Result).all()
 
-        for key, group in group_results:
-            experiment_name = ''
-            results = list(group)
-            for arg in key:
-                if str(arg).startswith('experiment_name'):
-                    experiment_name = str(arg)[17:]
+        key_fnc_i = lambda x: re.search('.*experiment_name\: ([a-z|A-Z|_]+).*', str([str(arg) for arg in x.args])).group(1)
+        query_results = sorted(query_results, key=key_fnc_i)
+        group_results = groupby(query_results, key_fnc_i)
 
-            accuracies = []
-            aris = []
-            f_measures = []
-            for result in results:
-                accuracies += [result.accuracy]
-                aris += [result.adjusted_rand_score]
-                f_measures += [result.f_measure]
+        names = []
+        for experiment_name, group_i in group_results:
+            print(f'Experiment name: {experiment_name}')
+            names += [experiment_name]
+            results_i = list(group_i)
 
-            dbs += [db]
-            experiment_names += [experiment_name]
-            results_table += [
-                [f'{np.average(accuracies)} ± {np.std(accuracies)}', f'{np.average(aris)} ± {np.std(aris)}',
-                 f'{np.average(f_measures)} ± {np.std(f_measures)}']]
+            key_fnc_j = lambda x: re.search('.*scenario\: \[\[(.*?)\]\].*', str([str(arg) for arg in x.args])).group(1)
+            results_i = sorted(results_i, key=key_fnc_j)
+            group_results_j = groupby(results_i, key_fnc_j)
 
+            for scenario, group_j in group_results_j:
+                print(f'Scenario: {scenario}')
+                results_j = list(group_j)
+
+                key_fnc_k = lambda x: str([str(arg) for arg in x.args]).replace(experiment_name, '').replace(scenario, '')
+                results_k = sorted(results_j, key=key_fnc_k)
+                group_results_k = groupby(results_k, key_fnc_k)
+
+                for args_k, group_k in group_results_k:
+                    dbs += [db]
+                    datasets += [experiment_name]
+                    scenarios += [scenario]
+                    args_idx += [args_k]
+
+                    accuracies_avg = np.average([result.accuracy for result in results_j])
+                    accuracies_std = np.std([result.accuracy for result in results_j])
+                    ari_avg = np.average([result.adjusted_rand_score for result in results_j])
+                    ari_std = np.std([result.adjusted_rand_score for result in results_j])
+                    f_measure_avg = np.average([result.f_measure for result in results_j])
+                    f_measure_std = np.std([result.f_measure for result in results_j])
+
+                    metrics += [[accuracies_avg, accuracies_std,
+                                 ari_avg, ari_std,
+                                 f_measure_avg, f_measure_std]]
         session.close()
 
-    results_index = pd.MultiIndex.from_arrays([dbs, experiment_names])
-    results_table = pd.DataFrame(results_table, index=results_index, columns=['Accuracy', 'ARI', 'F-Measure']).transpose()
-    results_table.to_excel('results_summary.xlsx')
+        df_index = pd.MultiIndex.from_arrays([dbs, datasets, scenarios, args_idx],
+                                             names=['database', 'dataset', 'scenario', 'args'])
+        df_columns = [['Accuracy'] * 2 + ['ARI'] * 2 + ['F-Measure'] * 2, ['average', 'std'] * 3]
+        df_columns = pd.MultiIndex.from_arrays(df_columns)
+
+        df = pd.DataFrame(data=metrics, index=df_index, columns=df_columns)
+        df.sort_index(level=1, inplace=True)
+
+        df.to_excel(args.output_file)
 
 
 def main(args=None):

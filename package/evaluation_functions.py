@@ -1,5 +1,6 @@
 import numpy as np
 import rpy2
+from package.DBCV import DBCV
 from scipy.spatial import distance
 from sklearn.metrics import silhouette_samples, silhouette_score, accuracy_score, f1_score, adjusted_rand_score
 
@@ -40,8 +41,8 @@ def eval_features(X, ac, metric, samples_dist_matrix, individual):
     if metric == 'min_silhouette_sklearn':
         index1 = np.min(silhouette_samples(X, prediction))
     elif metric == 'silhouette_sklearn':
-        index1 = silhouette_score(
-            samples_dist_matrix, prediction, metric='precomputed')
+        index1 = DBCV(
+            X, prediction)
     else:
         index1 = r['unique_criteria'](X, prediction, metric)
         index1 = np.asarray(index1)[0][0]
