@@ -52,4 +52,3 @@ def class_cluster_match(y_true, y_pred):
     return_list = [true_idx[pred_idx.index(y)] for y in y_pred]
 
     return return_list
-
