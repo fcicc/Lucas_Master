@@ -5,25 +5,28 @@ from scipy.spatial import distance
 from sklearn.metrics import silhouette_samples, silhouette_score, accuracy_score, f1_score, adjusted_rand_score
 
 from rpy2.robjects import r
+import rpy2.robjects.numpy2ri
+rpy2.robjects.numpy2ri.activate()
 
 from package.utils import class_cluster_match
 
-R_ALLOWED_FITNESSES = [('C_index', -1), ('Calinski_Harabasz', 1), ('Davies_Bouldin', -1),
-                       ('Dunn', 1), ('Gamma', 1), ('G_plus',
+CLUSTER_CRIT_ALLOWED_FITNESSES = [('C_index', -1), ('Calinski_Harabasz', 1), ('Davies_Bouldin', -1),
+                                  ('Dunn', 1), ('Gamma', 1), ('G_plus',
                                                    1), ('GDI11', 1), ('GDI12', 1),
-                       ('GDI13', 1), ('GDI21', 1), ('GDI22',
+                                  ('GDI13', 1), ('GDI21', 1), ('GDI22',
                                                     1), ('GDI23', 1), ('GDI31', 1),
-                       ('GDI32', 1), ('GDI33', 1), ('GDI41',
+                                  ('GDI32', 1), ('GDI33', 1), ('GDI41',
                                                     1), ('GDI42', 1), ('GDI43', 1),
-                       ('GDI51', 1), ('GDI52', 1), ('GDI53',
+                                  ('GDI51', 1), ('GDI52', 1), ('GDI53',
                                                     1), ('McClain_Rao', -1), ('PBM', 1),
-                       ('Point_Biserial', 1), ('Ray_Turi', -
+                                  ('Point_Biserial', 1), ('Ray_Turi', -
                                                1), ('Ratkowsky_Lance', 1),
-                       ('SD_Scat', -1), ('SD_Dis', -
+                                  ('SD_Scat', -1), ('SD_Dis', -
                                          1), ('Silhouette', 1), ('Tau', 1),
-                       ('Wemmert_Gancarski', 1)]
-ALLOWED_FITNESSES = R_ALLOWED_FITNESSES + \
-    [('silhouette_sklearn', 1), ('min_silhouette_sklearn', 1)]
+                                  ('Wemmert_Gancarski', 1)]
+ALLOWED_FITNESSES = CLUSTER_CRIT_ALLOWED_FITNESSES + \
+                    [('silhouette_sklearn', 1), ('min_silhouette_sklearn', 1),  ('DBCV', 1)]
+DICT_ALLOWED_FITNESSES = dict(ALLOWED_FITNESSES)
 
 
 r('''
@@ -41,14 +44,18 @@ def eval_features(X, ac, metric, samples_dist_matrix, individual):
     if metric == 'min_silhouette_sklearn':
         index1 = np.min(silhouette_samples(X, prediction))
     elif metric == 'silhouette_sklearn':
-        index1 = DBCV(
-            X, prediction)
+        index1 = silhouette_score(
+            samples_dist_matrix, prediction, metric='precomputed')
+    elif metric == 'DBCV':
+        index1 = DBCV(X, prediction)
     else:
         index1 = r['unique_criteria'](X, prediction, metric)
         index1 = np.asarray(index1)[0][0]
 
     if 'silhouette' in metric:
         index1 += 1
+
+    index1 *= DICT_ALLOWED_FITNESSES[metric]
 
     return index1,
 
@@ -107,7 +114,7 @@ def evaluate_rate_metrics(X, y, ac, samples_dist_matrix, individual):
 
     y_prediction = class_cluster_match(y, prediction)
 
-    fitness_names = list([fit[0] for fit in R_ALLOWED_FITNESSES])
+    fitness_names = list([fit[0] for fit in CLUSTER_CRIT_ALLOWED_FITNESSES])
     X_R = rpy2.robjects.r.matrix(
         rpy2.robjects.FloatVector(X.flatten()), nrow=X.shape[0])
 
