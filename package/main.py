@@ -171,18 +171,17 @@ def run(args=None):
             best_features = dataset.columns.values
             best_prediction = strategy_clustering.labels_
             strategy_clustering.metrics_ = ''
+        elif args.strategy == 'random_ga':
+            best_features = dataset.columns.values
+            best_prediction = strategy_clustering.global_best_
+            strategy_clustering.metrics_ = ''
 
-        # std_variances = dataset.std(axis=0)
-        # result = {
-        #     feature: std_variance for feature, std_variance in zip(best_features, std_variances)}
-        # result = pd.DataFrame.from_dict(result, orient='index')
-        # result.columns = ['std']
         initial_n_features = dataset_matrix.shape[1]
         final_n_features = len(best_features)
 
         y_prediction = class_cluster_match(y, best_prediction)
         cm = confusion_matrix(y, y_prediction)
-        cm = pd.DataFrame(data=cm, index=unique_labels(y), columns=unique_labels(best_prediction))
+        cm = pd.DataFrame(data=cm, index=unique_labels(y), columns=unique_labels(y))
 
         accuracy = accuracy_score(y, y_prediction)
         f_measure = f1_score(y, y_prediction, average='weighted')

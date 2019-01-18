@@ -68,11 +68,11 @@ def setup_toolbox(data_shape, min_features, max_features, algorithm, n_clusters)
     toolbox = base.Toolbox()
 
     if algorithm is None:
-        toolbox.register("attr_bool", random.randint, 0, n_clusters)
+        toolbox.register("attr_bool", random.randint, 0, n_clusters-1)
         toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, n=data_shape[0])
         toolbox.register("population", tools.initRepeat, list, toolbox.individual)
         toolbox.register("mate", tools.cxUniform, indpb=0.1)
-        toolbox.register("mutate", tools.mutUniformInt, low=0, up=n_clusters, indpb=0.05)
+        toolbox.register("mutate", tools.mutUniformInt, low=0, up=n_clusters-1, indpb=0.05)
         toolbox.register("select", tools.selTournament, tournsize=3)
 
     else:

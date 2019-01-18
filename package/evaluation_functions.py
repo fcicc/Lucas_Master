@@ -104,9 +104,9 @@ def perfect_eval_features(X, y, ac, individual):
 
     y_prediction = class_cluster_match(y, prediction)
 
-    y_num = class_cluster_match(prediction, y)
+    # y_num = class_cluster_match(prediction, y)
 
-    return accuracy_score(y, y_prediction), f1_score(y_num, prediction, average='weighted')
+    return accuracy_score(y, y_prediction), 0
 
 
 def evaluate_rate_metrics(X, y, ac, samples_dist_matrix, individual):
@@ -132,7 +132,8 @@ def evaluate_rate_metrics(X, y, ac, samples_dist_matrix, individual):
         samples_dist_matrix, prediction, metric='precomputed')
     min_silhouette = np.min(silhouette_samples(X, prediction))
     adj_rand = adjusted_rand_score(y, prediction)
-    f1 = f1_score(y, y_prediction, average='weighted')
+    # f1 = f1_score(y, y_prediction, average='weighted')
+    f1 = 0
     acc = accuracy_score(y, y_prediction)
     complexity = int(np.sum(individual))
 
