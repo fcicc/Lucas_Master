@@ -384,13 +384,15 @@ def export_results(args):
                     datasets += [experiment_name]
                     scenarios += [scenario]
                     args_idx += [args_k]
+                    
+                    results_k = list(group_k)
 
-                    accuracies_avg = np.average([result.accuracy for result in results_j])
-                    accuracies_std = np.std([result.accuracy for result in results_j])
-                    ari_avg = np.average([result.adjusted_rand_score for result in results_j])
-                    ari_std = np.std([result.adjusted_rand_score for result in results_j])
-                    f_measure_avg = np.average([result.f_measure for result in results_j])
-                    f_measure_std = np.std([result.f_measure for result in results_j])
+                    accuracies_avg = np.average([result.accuracy for result in results_k])
+                    accuracies_std = np.std([result.accuracy for result in results_k])
+                    ari_avg = np.average([result.adjusted_rand_score for result in results_k])
+                    ari_std = np.std([result.adjusted_rand_score for result in results_k])
+                    f_measure_avg = np.average([result.f_measure for result in results_k])
+                    f_measure_std = np.std([result.f_measure for result in results_k])
 
                     metrics += [[accuracies_avg, accuracies_std,
                                  ari_avg, ari_std,

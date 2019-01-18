@@ -40,7 +40,10 @@ r('''
 
 def eval_features(X, ac, metric, samples_dist_matrix, individual):
     """Evaluate individual according to silhouette score."""
-    prediction = ac.fit(X * individual).labels_
+    if ac is None:
+        prediction = individual
+    else:
+        prediction = ac.fit(X * individual).labels_
     if metric == 'min_silhouette_sklearn':
         index1 = np.min(silhouette_samples(X, prediction))
     elif metric == 'silhouette_sklearn':
@@ -110,7 +113,10 @@ def evaluate_rate_metrics(X, y, ac, samples_dist_matrix, individual):
     """Evaluate individual according multiple metrics and scores.
     :type X: numpy.ndarray
     """
-    prediction = ac.fit(X * individual).labels_
+    if ac is None:
+        prediction = individual
+    else:
+        prediction = ac.fit(X * individual).labels_
 
     y_prediction = class_cluster_match(y, prediction)
 

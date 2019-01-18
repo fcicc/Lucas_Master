@@ -64,18 +64,27 @@ def setup_creator(fitness_metric):
         creator.create("Individual", np.ndarray, fitness=creator.FitnessMax)
 
 
-def setup_toolbox(data_shape, min_features, max_features):
+def setup_toolbox(data_shape, min_features, max_features, algorithm, n_clusters):
     toolbox = base.Toolbox()
 
-    toolbox.register("attr_bool", random.randint, 0, 1)
-    toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, n=data_shape[1])
-    toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-    toolbox.register("mate", tools.cxUniform, indpb=0.1)
-    toolbox.register("mutate", tools.mutFlipBit, indpb=0.05)
-    toolbox.register("select", tools.selTournament, tournsize=3)
+    if algorithm is None:
+        toolbox.register("attr_bool", random.randint, 0, n_clusters)
+        toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, n=data_shape[0])
+        toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+        toolbox.register("mate", tools.cxUniform, indpb=0.1)
+        toolbox.register("mutate", tools.mutUniformInt, low=0, up=n_clusters, indpb=0.05)
+        toolbox.register("select", tools.selTournament, tournsize=3)
 
-    toolbox.decorate("mate", check_bounds(min_features, max_features))
-    toolbox.decorate("mutate", check_bounds(min_features, max_features))
+    else:
+        toolbox.register("attr_bool", random.randint, 0, 1)
+        toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, n=data_shape[1])
+        toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+        toolbox.register("mate", tools.cxUniform, indpb=0.1)
+        toolbox.register("mutate", tools.mutFlipBit, indpb=0.05)
+        toolbox.register("select", tools.selTournament, tournsize=3)
+
+        toolbox.decorate("mate", check_bounds(min_features, max_features))
+        toolbox.decorate("mutate", check_bounds(min_features, max_features))
 
     return toolbox
 
@@ -84,7 +93,7 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
 
     def __init__(self, algorithm=None, n_generations=100, perfect=False,
                  min_features=5, max_features=1000, fitness_metric='silhouette_sklearn',
-                 pop_size=128, pop_eval_rate=0):
+                 pop_size=128, pop_eval_rate=0, n_clusters=2):
         self.algorithm = algorithm
         self.n_generations = n_generations
         self.perfect = perfect
@@ -93,6 +102,7 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
         self.fitness_metric = fitness_metric
         self.pop_size = pop_size
         self.pop_eval_rate = pop_eval_rate
+        self.n_clusters = n_clusters
 
     def fit(self, X, y=None):
         population_rate = math.ceil(self.pop_eval_rate * self.pop_size)
@@ -101,7 +111,7 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
         # samples_dist_matrix = custom_distance(X)
 
         setup_creator(self.fitness_metric)
-        toolbox = setup_toolbox(X.shape, self.min_features, self.max_features)
+        toolbox = setup_toolbox(X.shape, self.min_features, self.max_features, self.algorithm, self.n_clusters)
         toolbox.register("evaluate", eval_features, X, self.algorithm, self.fitness_metric, samples_dist_matrix)
 
         n_threads = math.floor(cpu_count() / 2)
@@ -110,8 +120,9 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
 
         population = toolbox.population(n=self.pop_size)
         ind = random.choice(range(len(population)))
-        population[ind][:] = [0]*X.shape[1]
-        population = list(map(partial(force_bounds, self.min_features, self.max_features), population))
+        if self.algorithm is not None:
+            population[ind][:] = [0]*X.shape[1]
+            population = list(map(partial(force_bounds, self.min_features, self.max_features), population))
 
         evaluate_rate_function = partial(evaluate_rate_metrics, X, y, self.algorithm, samples_dist_matrix)
 

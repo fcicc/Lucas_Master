@@ -58,7 +58,7 @@ def argument_parser(args) -> argparse.Namespace:
                         help='sqlite file to store results')
     parser.add_argument('-s', '--strategy', type=str, default='ga',
                         help='ga(Genetic Algorithm) or PSO (Particle Swarm Optimization)', choices=['ga', 'pso',
-                                                                                                    'ward_p'])
+                                                                                                    'ward_p', 'random_ga'])
     parser.add_argument('-n', '--run-multiple', type=int, default=1,
                         help='number of multiple runs')
     parser.add_argument('--p_ward', type=float, default=2,
@@ -122,6 +122,11 @@ def run(args=None):
                                                min_features=args.min_features, max_features=args.max_features,
                                                fitness_metric=args.fitness_metric, pop_size=args.pop_size,
                                                pop_eval_rate=args.eval_rate)
+        elif args.strategy == 'random_ga':
+            strategy_clustering = GAClustering(algorithm=None, n_generations=args.num_gen, perfect=args.perfect,
+                                               min_features=args.min_features, max_features=args.max_features,
+                                               fitness_metric=args.fitness_metric, pop_size=args.pop_size,
+                                               pop_eval_rate=args.eval_rate, n_clusters=len(unique_labels(y)))
         elif args.strategy == 'pso':
             strategy_clustering = PSOClustering(algorithm=ac, n_generations=args.num_gen, perfect=args.perfect,
                                                 fitness_metric=args.fitness_metric, pop_size=args.pop_size,
