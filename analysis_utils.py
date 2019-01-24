@@ -349,7 +349,6 @@ def export_results(args):
     dbs = []
     datasets = []
     scenarios = []
-    args_idx = []
     metrics = []
     for db in databases:
         print(f'Processing {db}...')
@@ -362,6 +361,7 @@ def export_results(args):
         group_results = groupby(query_results, key_fnc_i)
 
         names = []
+        args_columns_names = None
         for experiment_name, group_i in group_results:
             print(f'Experiment name: {experiment_name}')
             names += [experiment_name]
@@ -383,8 +383,7 @@ def export_results(args):
                     dbs += [db]
                     datasets += [experiment_name]
                     scenarios += [scenario]
-                    args_idx += [args_k]
-                    
+
                     results_k = list(group_k)
 
                     accuracies_avg = np.average([result.accuracy for result in results_k])
@@ -393,15 +392,20 @@ def export_results(args):
                     ari_std = np.std([result.adjusted_rand_score for result in results_k])
                     f_measure_avg = np.average([result.f_measure for result in results_k])
                     f_measure_std = np.std([result.f_measure for result in results_k])
+                    result_args = [x.value for x in results_k[0].args]
+
+                    if args_columns_names is None:
+                        args_columns_names = [x.name for x in results_k[0].args]
 
                     metrics += [[accuracies_avg, accuracies_std,
                                  ari_avg, ari_std,
-                                 f_measure_avg, f_measure_std]]
+                                 f_measure_avg, f_measure_std] + result_args]
         session.close()
 
-        df_index = pd.MultiIndex.from_arrays([dbs, datasets, scenarios, args_idx],
-                                             names=['database', 'dataset', 'scenario', 'args'])
-        df_columns = [['Accuracy'] * 2 + ['ARI'] * 2 + ['F-Measure'] * 2, ['average', 'std'] * 3]
+        df_index = pd.MultiIndex.from_arrays([dbs, datasets, scenarios],
+                                             names=['database', 'dataset', 'scenario'])
+        df_columns = [['Accuracy'] * 2 + ['ARI'] * 2 + ['F-Measure'] * 2 + ['args'] * len(args_columns_names),
+                      ['average', 'std'] * 3 + args_columns_names]
         df_columns = pd.MultiIndex.from_arrays(df_columns)
 
         df = pd.DataFrame(data=metrics, index=df_index, columns=df_columns)
