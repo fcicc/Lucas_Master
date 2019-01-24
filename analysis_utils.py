@@ -48,6 +48,7 @@ def argument_parser(args) -> argparse.Namespace:
     parser.add_argument('--logs-folder', type=str, default=None)
     parser.add_argument('--plot-logs', action='store_true')
     parser.add_argument('--export-results', action='store_true')
+    parser.add_argument('--export-results-plot', action='store_true')
 
     args = parser.parse_args(args=args)
 
@@ -57,7 +58,8 @@ def argument_parser(args) -> argparse.Namespace:
             args.average_feature_selection, args.list_results,
             args.detail_result, args.confusion_matrix,
             args.filter, args.select_best,
-            args.plot_logs, args.export_results]) != 1:
+            args.plot_logs, args.export_results,
+            args.export_results_plot]) != 1:
         raise ValueError("Cannot have this combination of arguments.")
 
     return args
@@ -348,7 +350,6 @@ def export_results(args):
 
     dbs = []
     datasets = []
-    scenarios = []
     metrics = []
     for db in databases:
         print(f'Processing {db}...')
@@ -382,7 +383,6 @@ def export_results(args):
                 for args_k, group_k in group_results_k:
                     dbs += [db]
                     datasets += [experiment_name]
-                    scenarios += [scenario]
 
                     results_k = list(group_k)
 
@@ -402,17 +402,31 @@ def export_results(args):
                                  f_measure_avg, f_measure_std] + result_args]
         session.close()
 
-        df_index = pd.MultiIndex.from_arrays([dbs, datasets, scenarios],
-                                             names=['database', 'dataset', 'scenario'])
+        df_index = pd.MultiIndex.from_arrays([dbs, datasets],
+                                             names=['database', 'dataset'])
         df_columns = [['Accuracy'] * 2 + ['ARI'] * 2 + ['F-Measure'] * 2 + ['args'] * len(args_columns_names),
                       ['average', 'std'] * 3 + args_columns_names]
         df_columns = pd.MultiIndex.from_arrays(df_columns)
 
         df = pd.DataFrame(data=metrics, index=df_index, columns=df_columns)
-        df.sort_index(level=1, inplace=True)
+        df.sort_index(level=[1], inplace=True)
 
         df.to_excel(args.output_file)
 
+
+def export_results_to_plot(args):
+    df = pd.read_excel(args.input_file, index_col=[0, 1], header=[0, 1])
+
+    writer = pd.ExcelWriter(args.output_file)
+    for scenario, group_i in df.groupby(('args', 'scenario')):
+        df_sheet = pd.DataFrame()
+        for fitness, group_j in group_i.groupby(('args', 'fitness_metric')):
+            column_series = pd.Series(name=fitness, data=group_j[('Accuracy', 'average')])
+            df_sheet = pd.concat([df_sheet, column_series], axis=1)
+        scenario = scenario.replace('[', '').replace(']', '').replace('\\', '').replace("'", '')[:30]
+        df_sheet.to_excel(writer, sheet_name=scenario)
+
+    writer.close()
 
 def main(args=None):
     args = argument_parser(args)
@@ -446,6 +460,8 @@ def main(args=None):
         plot_logs(args)
     elif args.export_results:
         export_results(args)
+    elif args.export_results_plot:
+        export_results_to_plot(args)
 
     return result
 
