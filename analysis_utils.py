@@ -4,6 +4,7 @@ import glob
 import os
 import re
 from collections import Iterable
+from copy import deepcopy
 from itertools import groupby
 from typing import List
 
@@ -351,6 +352,7 @@ def export_results(args):
     dbs = []
     datasets = []
     metrics = []
+    arguments = []
     for db in databases:
         print(f'Processing {db}...')
         session = local_create_session(db)
@@ -386,47 +388,59 @@ def export_results(args):
 
                     results_k = list(group_k)
 
+                    if args_columns_names is None:
+                        args_columns_names = [x.name for x in results_k[0].args]
+
                     accuracies_avg = np.average([result.accuracy for result in results_k])
                     accuracies_std = np.std([result.accuracy for result in results_k])
                     ari_avg = np.average([result.adjusted_rand_score for result in results_k])
                     ari_std = np.std([result.adjusted_rand_score for result in results_k])
                     f_measure_avg = np.average([result.f_measure for result in results_k])
                     f_measure_std = np.std([result.f_measure for result in results_k])
-                    result_args = [x.value for x in results_k[0].args]
-
-                    if args_columns_names is None:
-                        args_columns_names = [x.name for x in results_k[0].args]
+                    result_args = {x.name: x.value for x in results_k[0].args}
 
                     metrics += [[accuracies_avg, accuracies_std,
                                  ari_avg, ari_std,
-                                 f_measure_avg, f_measure_std] + result_args]
+                                 f_measure_avg, f_measure_std]]
+                    arguments += [result_args]
+
         session.close()
 
         df_index = pd.MultiIndex.from_arrays([dbs, datasets],
                                              names=['database', 'dataset'])
-        df_columns = [['Accuracy'] * 2 + ['ARI'] * 2 + ['F-Measure'] * 2 + ['args'] * len(args_columns_names),
-                      ['average', 'std'] * 3 + args_columns_names]
+        df_columns = [['Accuracy'] * 2 + ['ARI'] * 2 + ['F-Measure'] * 2,
+                      ['average', 'std'] * 3]
         df_columns = pd.MultiIndex.from_arrays(df_columns)
 
         df = pd.DataFrame(data=metrics, index=df_index, columns=df_columns)
+        args_df = pd.DataFrame(arguments, index=df.index)
+        args_df.columns = pd.MultiIndex.from_product([['args'], args_df.columns])
+        df = pd.concat([df, args_df], axis=1)
         df.sort_index(level=[1], inplace=True)
 
         df.to_excel(args.output_file)
 
 
 def export_results_to_plot(args):
+    """In case of duplicate fitness metrics for the same dataset, the last execution is selected"""
     df = pd.read_excel(args.input_file, index_col=[0, 1], header=[0, 1])
 
     writer = pd.ExcelWriter(args.output_file)
+
     for scenario, group_i in df.groupby(('args', 'scenario')):
         df_sheet = pd.DataFrame()
         for fitness, group_j in group_i.groupby(('args', 'fitness_metric')):
+            print(f'{fitness} - {scenario}')
             column_series = pd.Series(name=fitness, data=group_j[('Accuracy', 'average')])
+            column_series = column_series[~column_series.index.duplicated(keep='last')]
+            if column_series.name in df_sheet:
+                del df_sheet[column_series.name]
             df_sheet = pd.concat([df_sheet, column_series], axis=1)
         scenario = scenario.replace('[', '').replace(']', '').replace('\\', '').replace("'", '')[:30]
         df_sheet.to_excel(writer, sheet_name=scenario)
 
     writer.close()
+
 
 def main(args=None):
     args = argument_parser(args)
