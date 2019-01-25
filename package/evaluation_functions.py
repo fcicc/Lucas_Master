@@ -25,7 +25,7 @@ CLUSTER_CRIT_ALLOWED_FITNESSES = [('C_index', -1), ('Calinski_Harabasz', 1), ('D
                                          1), ('Silhouette', 1), ('Tau', 1),
                                   ('Wemmert_Gancarski', 1)]
 ALLOWED_FITNESSES = CLUSTER_CRIT_ALLOWED_FITNESSES + \
-                    [('silhouette_sklearn', 1), ('min_silhouette_sklearn', 1),  ('DBCV', 1)]
+                    [('silhouette_sklearn', 1), ('min_silhouette_sklearn', 1),  ('DBCV', 1), ('accuracy', 1)]
 DICT_ALLOWED_FITNESSES = dict(ALLOWED_FITNESSES)
 
 
@@ -38,12 +38,13 @@ r('''
     ''')
 
 
-def eval_features(X, ac, metric, samples_dist_matrix, individual):
+def eval_features(X, ac, metric, samples_dist_matrix, y, individual):
     """Evaluate individual according to silhouette score."""
     if ac is None:
         prediction = individual
     else:
         prediction = ac.fit(X * individual).labels_
+
     if metric == 'min_silhouette_sklearn':
         index1 = np.min(silhouette_samples(X, prediction))
     elif metric == 'silhouette_sklearn':
@@ -51,6 +52,10 @@ def eval_features(X, ac, metric, samples_dist_matrix, individual):
             samples_dist_matrix, prediction, metric='precomputed')
     elif metric == 'DBCV':
         index1 = DBCV(X, prediction)
+    elif metric == 'accuracy':
+        if y is None:
+            raise ValueError('The correct values are obligatory to calculate accuracy')
+        index1 = accuracy_score(y, prediction)
     else:
         index1 = r['unique_criteria'](X, prediction, metric)
         index1 = np.asarray(index1)[0][0]

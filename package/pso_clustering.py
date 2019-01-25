@@ -77,7 +77,7 @@ class PSOClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
 
         setup_creator(self.fitness_metric)
         toolbox = setup_toolbox(X.shape)
-        toolbox.register("evaluate", eval_features, X, self.algorithm, self.fitness_metric, samples_dist_matrix)
+        toolbox.register("evaluate", eval_features, X, self.algorithm, self.fitness_metric, samples_dist_matrix, y)
 
         pool = Pool(initializer=setup_creator, initargs=[self.fitness_metric])
         toolbox.register("map", pool.map)
