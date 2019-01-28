@@ -7,12 +7,12 @@ import pandas as pd
 import rpy2
 from rpy2.rinterface import RRuntimeWarning
 from sklearn import cluster
-from sklearn.metrics import confusion_matrix, silhouette_score, adjusted_rand_score, \
-    accuracy_score, f1_score
+from sklearn.metrics import confusion_matrix
 from sklearn.utils.multiclass import unique_labels
-from tqdm import tqdm
 
+from package.CheatingClustering import CheatingClustering
 from package.coclustering import CoClustering
+from package.evaluation_functions import eval_features, DICT_ALLOWED_FITNESSES, eval_multiple
 from package.ga_clustering import ALLOWED_FITNESSES, GAClustering
 from package.orm_interface import store_results
 from package.orm_models import create_if_not_exists
@@ -51,7 +51,7 @@ def argument_parser(args) -> argparse.Namespace:
                         help='fitness function to be used', choices=[fitnes_str for fitnes_str, _ in ALLOWED_FITNESSES])
     parser.add_argument('--cluster-algorithm', type=str, default='agglomerative',
                         help='cluster algorithm to be used', choices=['agglomerative', 'kmeans',
-                                                                      'affinity-propagation'])
+                                                                      'affinity-propagation', 'perfect-classifier'])
     parser.add_argument('-d', '--dont-use-ga', action='store_true',
                         help='disables the use of GA and apply cluster to all dimensions')
     parser.add_argument('-o', '--db-file', type=str, default='./local.db',
@@ -109,6 +109,8 @@ def run(args=None):
         ac = cluster.KMeans(n_clusters=len(unique_labels(y)), n_init=10)
     elif args.cluster_algorithm == 'affinity-propagation':
         ac = cluster.AffinityPropagation(preference=-250)
+    elif args.cluster_algorithm == 'perfect-classifier':
+        ac = CheatingClustering(y=y)
 
     # if len(unique_labels(y)) > args.min_features:
     #     args.min_features = len(unique_labels(y))
@@ -180,12 +182,12 @@ def run(args=None):
     cm = confusion_matrix(y, y_prediction)
     cm = pd.DataFrame(data=cm, index=unique_labels(y), columns=unique_labels(y))
 
-    accuracy = accuracy_score(y, y_prediction)
-    f_measure = f1_score(y, y_prediction, average='weighted')
-    adj_rand_score = adjusted_rand_score(y, best_prediction)
-    silhouette = silhouette_score(dataset[best_features], best_prediction)
+    allowed_fitness = list(DICT_ALLOWED_FITNESSES.keys())
+    scores = [(fitness_name, fitness_value) for fitness_name, fitness_value in
+              zip(allowed_fitness, eval_multiple(dataset_matrix, ac, allowed_fitness, y, strategy_clustering.global_best_))]
+    scores = dict(scores)
 
-    result_id = store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_features, final_n_features,
+    result_id = store_results(scores, initial_n_features, final_n_features,
                               start_time, end_time, cm, args, best_features, args.experiment_name,
                               strategy_clustering.metrics_, args.db_file, best_prediction)
 

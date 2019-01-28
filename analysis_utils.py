@@ -2,10 +2,6 @@ import argparse
 import csv
 import glob
 import os
-import re
-from collections import Iterable
-from copy import deepcopy
-from itertools import groupby
 from typing import List
 
 import lasio
@@ -17,7 +13,6 @@ from sqlalchemy import asc
 from sqlalchemy.exc import OperationalError
 
 from package.orm_models import Result, local_create_session
-from package.preprocessing import binaryze_column
 from package.utils import class_cluster_match
 
 
@@ -49,7 +44,6 @@ def argument_parser(args) -> argparse.Namespace:
     parser.add_argument('--logs-folder', type=str, default=None)
     parser.add_argument('--plot-logs', action='store_true')
     parser.add_argument('--export-results', action='store_true')
-    parser.add_argument('--export-results-plot', action='store_true')
 
     args = parser.parse_args(args=args)
 
@@ -59,8 +53,7 @@ def argument_parser(args) -> argparse.Namespace:
             args.average_feature_selection, args.list_results,
             args.detail_result, args.confusion_matrix,
             args.filter, args.select_best,
-            args.plot_logs, args.export_results,
-            args.export_results_plot]) != 1:
+            args.plot_logs, args.export_results]) != 1:
         raise ValueError("Cannot have this combination of arguments.")
 
     return args
@@ -347,99 +340,29 @@ def select_best(args):
 
 
 def export_results(args):
-    databases = glob.glob(args.db_file)
-
-    dbs = []
-    datasets = []
-    metrics = []
-    arguments = []
-    for db in databases:
-        print(f'Processing {db}...')
-        session = local_create_session(db)
-
-        query_results: List[Result] = session.query(Result).all()
-
-        key_fnc_i = lambda x: re.search('.*experiment_name\: ([a-z|A-Z|_]+).*', str([str(arg) for arg in x.args])).group(1)
-        query_results = sorted(query_results, key=key_fnc_i)
-        group_results = groupby(query_results, key_fnc_i)
-
-        names = []
-        args_columns_names = None
-        for experiment_name, group_i in group_results:
-            print(f'Experiment name: {experiment_name}')
-            names += [experiment_name]
-            results_i = list(group_i)
-
-            key_fnc_j = lambda x: re.search('.*scenario\: \[\[(.*?)\]\].*', str([str(arg) for arg in x.args])).group(1)
-            results_i = sorted(results_i, key=key_fnc_j)
-            group_results_j = groupby(results_i, key_fnc_j)
-
-            for scenario, group_j in group_results_j:
-                print(f'Scenario: {scenario}')
-                results_j = list(group_j)
-
-                key_fnc_k = lambda x: str([str(arg) for arg in x.args]).replace(experiment_name, '').replace(scenario, '')
-                results_k = sorted(results_j, key=key_fnc_k)
-                group_results_k = groupby(results_k, key_fnc_k)
-
-                for args_k, group_k in group_results_k:
-                    dbs += [db]
-                    datasets += [experiment_name]
-
-                    results_k = list(group_k)
-
-                    if args_columns_names is None:
-                        args_columns_names = [x.name for x in results_k[0].args]
-
-                    accuracies_avg = np.average([result.accuracy for result in results_k])
-                    accuracies_std = np.std([result.accuracy for result in results_k])
-                    ari_avg = np.average([result.adjusted_rand_score for result in results_k])
-                    ari_std = np.std([result.adjusted_rand_score for result in results_k])
-                    f_measure_avg = np.average([result.f_measure for result in results_k])
-                    f_measure_std = np.std([result.f_measure for result in results_k])
-                    result_args = {x.name: x.value for x in results_k[0].args}
-
-                    metrics += [[accuracies_avg, accuracies_std,
-                                 ari_avg, ari_std,
-                                 f_measure_avg, f_measure_std]]
-                    arguments += [result_args]
-
-        session.close()
-
-        df_index = pd.MultiIndex.from_arrays([dbs, datasets],
-                                             names=['database', 'dataset'])
-        df_columns = [['Accuracy'] * 2 + ['ARI'] * 2 + ['F-Measure'] * 2,
-                      ['average', 'std'] * 3]
-        df_columns = pd.MultiIndex.from_arrays(df_columns)
-
-        df = pd.DataFrame(data=metrics, index=df_index, columns=df_columns)
-        args_df = pd.DataFrame(arguments, index=df.index)
-        args_df.columns = pd.MultiIndex.from_product([['args'], args_df.columns])
-        df = pd.concat([df, args_df], axis=1)
-        df.sort_index(level=[1], inplace=True)
-
-        df.to_excel(args.output_file)
-
-
-def export_results_to_plot(args):
     """In case of duplicate fitness metrics for the same dataset, the last execution is selected"""
-    df = pd.read_excel(args.input_file, index_col=[0, 1], header=[0, 1])
+    session = local_create_session(args.db_file)
+    results = session.query(Result).all()
 
-    writer = pd.ExcelWriter(args.output_file)
+    experiment_names = [result.args_to_dict()['experiment_name'] for result in results]
+    scenarios_names = [result.args_to_dict()['scenario'] for result in results]
 
-    for scenario, group_i in df.groupby(('args', 'scenario')):
-        df_sheet = pd.DataFrame()
-        for fitness, group_j in group_i.groupby(('args', 'fitness_metric')):
-            print(f'{fitness} - {scenario}')
-            column_series = pd.Series(name=fitness, data=group_j[('Accuracy', 'average')])
-            column_series = column_series[~column_series.index.duplicated(keep='last')]
-            if column_series.name in df_sheet:
-                del df_sheet[column_series.name]
-            df_sheet = pd.concat([df_sheet, column_series], axis=1)
-        scenario = scenario.replace('[', '').replace(']', '').replace('\\', '').replace("'", '')[:30]
-        df_sheet.to_excel(writer, sheet_name=scenario)
+    index = pd.MultiIndex.from_arrays([experiment_names, scenarios_names], names=['dataset', 'scenario'])
 
-    writer.close()
+    df_rows = []
+    for result in results:
+        scores_dict = result.scores_to_dict()
+        data = [[float(val) for val in scores_dict.values()]]
+        df_rows += [pd.DataFrame(data=data, columns=scores_dict.keys())]
+
+    df = pd.concat(df_rows)
+    df.index = index
+    df.sort_index(axis=0, level=0, inplace=True)
+    df = df.groupby(level=[0, 1]).mean()
+
+    df.to_excel(args.output_file)
+
+    session.close()
 
 
 def main(args=None):
@@ -474,8 +397,6 @@ def main(args=None):
         plot_logs(args)
     elif args.export_results:
         export_results(args)
-    elif args.export_results_plot:
-        export_results_to_plot(args)
 
     return result
 

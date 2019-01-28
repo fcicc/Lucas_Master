@@ -1,8 +1,9 @@
-from package.orm_models import Result, ConfusionMatrix, ConfusionMatrixNumber, ConfusionMatrixLabel, SelectedFeature, Arg, \
-    local_create_session, ClusterLabel
+from package.orm_models import Result, ConfusionMatrix, ConfusionMatrixNumber, ConfusionMatrixLabel, SelectedFeature, \
+    Arg, \
+    local_create_session, ClusterLabel, Score
 
 
-def store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_features, final_n_features, start_time,
+def store_results(scores, initial_n_features, final_n_features, start_time,
                   end_time, confusion_matrix, args, selected_columns, result_name, ga_metrics, db_file, cluster_labels):
     """
 
@@ -15,10 +16,6 @@ def store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_fea
     :type selected_columns: list
     :type end_time: datetime.datetime
     :type start_time: datetime.datetime
-    :type silhouette: float
-    :type adj_rand_score: float
-    :type f_measure: float
-    :type accuracy: float
     :type confusion_matrix: pandas.DataFrame
     """
 
@@ -28,10 +25,6 @@ def store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_fea
         name=result_name,
         start_time=start_time,
         end_time=end_time,
-        accuracy=float(accuracy),
-        f_measure=float(f_measure),
-        adjusted_rand_score=float(adj_rand_score),
-        silhouette=float(silhouette),
         initial_n_features=int(initial_n_features),
         final_n_features=int(final_n_features),
         individual_evaluations=ga_metrics
@@ -48,6 +41,16 @@ def store_results(accuracy, f_measure, adj_rand_score, silhouette, initial_n_fea
         )
         args_entries.append(arg_entry)
     session.bulk_save_objects(args_entries)
+
+    scores_entries = []
+    for score_name, score_val in scores.items():
+        score_entry = Score(
+            result_id=result_entry.id,
+            name=score_name,
+            value=str(score_val[0])
+        )
+        scores_entries.append(score_entry)
+    session.bulk_save_objects(scores_entries)
 
     cm_entry = ConfusionMatrix(
         result_id=result_entry.id

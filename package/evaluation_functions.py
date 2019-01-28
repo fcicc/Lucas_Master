@@ -38,34 +38,37 @@ r('''
     ''')
 
 
-def eval_features(X, ac, metric, samples_dist_matrix, y, individual):
+def eval_features(X, ac, metric, y, individual):
     """Evaluate individual according to silhouette score."""
+    x_individual = X * individual
     if ac is None:
         prediction = individual
     else:
-        prediction = ac.fit(X * individual).labels_
+        prediction = ac.fit(x_individual).labels_
 
     if metric == 'min_silhouette_sklearn':
-        index1 = np.min(silhouette_samples(X, prediction))
+        index1 = np.min(silhouette_samples(x_individual, prediction))
     elif metric == 'silhouette_sklearn':
         index1 = silhouette_score(
-            samples_dist_matrix, prediction, metric='precomputed')
+            x_individual, prediction)
     elif metric == 'DBCV':
-        index1 = DBCV(X, prediction)
+        index1 = DBCV(x_individual, prediction)
     elif metric == 'accuracy':
         if y is None:
             raise ValueError('The correct values are obligatory to calculate accuracy')
-        index1 = accuracy_score(y, prediction)
+        y_prediction = class_cluster_match(y, prediction)
+        index1 = accuracy_score(y, y_prediction)
     else:
-        index1 = r['unique_criteria'](X, prediction, metric)
+        index1 = r['unique_criteria'](x_individual, prediction, metric)
         index1 = np.asarray(index1)[0][0]
-
-    if 'silhouette' in metric:
-        index1 += 1
 
     index1 *= DICT_ALLOWED_FITNESSES[metric]
 
     return index1,
+
+
+def eval_multiple(X, ac, metrics, y, individual):
+    return [eval_features(X, ac, metric, y, individual) for metric in metrics]
 
 
 def non_zero_and_dist(I, J):
@@ -112,37 +115,6 @@ def perfect_eval_features(X, y, ac, individual):
     # y_num = class_cluster_match(prediction, y)
 
     return accuracy_score(y, y_prediction), 0
-
-
-def evaluate_rate_metrics(X, y, ac, samples_dist_matrix, individual):
-    """Evaluate individual according multiple metrics and scores.
-    :type X: numpy.ndarray
-    """
-    if ac is None:
-        prediction = individual
-    else:
-        prediction = ac.fit(X * individual).labels_
-
-    y_prediction = class_cluster_match(y, prediction)
-
-    fitness_names = list([fit[0] for fit in CLUSTER_CRIT_ALLOWED_FITNESSES])
-    X_R = rpy2.robjects.r.matrix(
-        rpy2.robjects.FloatVector(X.flatten()), nrow=X.shape[0])
-
-    int_idx = r['unique_criteria'](
-        X_R, rpy2.robjects.FloatVector(prediction.tolist()), fitness_names)
-    int_idx = [val[0] for val in list(int_idx)]
-
-    silhouette = silhouette_score(
-        samples_dist_matrix, prediction, metric='precomputed')
-    min_silhouette = np.min(silhouette_samples(X, prediction))
-    adj_rand = adjusted_rand_score(y, prediction)
-    # f1 = f1_score(y, y_prediction, average='weighted')
-    f1 = 0
-    acc = accuracy_score(y, y_prediction)
-    complexity = int(np.sum(individual))
-
-    return list(int_idx) + [acc, f1, adj_rand, silhouette, min_silhouette, complexity]
 
 
 def evaluate(toolbox, offspring):

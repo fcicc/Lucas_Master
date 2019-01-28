@@ -13,8 +13,8 @@ from deap import creator, tools, base, algorithms
 from scipy.spatial import distance
 from tqdm import tqdm
 
-from package.evaluation_functions import ALLOWED_FITNESSES, eval_features, evaluate, evaluate_rate_metrics, \
-    custom_distance
+from package.evaluation_functions import ALLOWED_FITNESSES, eval_features, evaluate, \
+    DICT_ALLOWED_FITNESSES, eval_multiple
 
 
 def force_bounds(minimum, maximum, individual):
@@ -107,16 +107,13 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
     def fit(self, X, y=None):
         population_rate = math.ceil(self.pop_eval_rate * self.pop_size)
 
-        samples_dist_matrix = distance.squareform(distance.pdist(X))
-        # samples_dist_matrix = custom_distance(X)
-
         setup_creator(self.fitness_metric)
         toolbox = setup_toolbox(X.shape, self.min_features, self.max_features, self.algorithm, self.n_clusters)
-        toolbox.register("evaluate", eval_features, X, self.algorithm, self.fitness_metric, samples_dist_matrix)
+        toolbox.register("evaluate", eval_features, X, self.algorithm, self.fitness_metric, y)
 
         n_threads = math.floor(cpu_count() / 2)
         pool = Pool(processes=n_threads, initializer=setup_creator, initargs=[self.fitness_metric])
-        toolbox.register("map", pool.map)
+        # toolbox.register("map", pool.map)
 
         population = toolbox.population(n=self.pop_size)
         ind = random.choice(range(len(population)))
@@ -124,14 +121,14 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
             population[ind][:] = [0]*X.shape[1]
             population = list(map(partial(force_bounds, self.min_features, self.max_features), population))
 
-        evaluate_rate_function = partial(evaluate_rate_metrics, X, y, self.algorithm, samples_dist_matrix)
+        evaluate_rate_function = partial(eval_multiple, X, self.algorithm, DICT_ALLOWED_FITNESSES.keys(), y)
 
-        metrics = []
         global_best = None
         feature_selection_rate = []
         evaluate(toolbox, population)
+        metrics = []
         for gen in tqdm(range(self.n_generations), desc=f'{n_threads} threads'):
-            if population_rate:
+            if population_rate > 0:
                 sample_offspring = random.sample(population, population_rate)
                 sample_fits = toolbox.map(evaluate_rate_function, sample_offspring)
                 sample_fits = [metric + [gen] for metric in sample_fits]
@@ -149,14 +146,7 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
 
             feature_selection_rate.append(list(map(lambda x: x / len(population), np.sum(population, axis=0))))
 
-        metrics_names = ['C_index', 'Calinski_Harabasz',
-                          'Davies_Bouldin', 'Dunn', 'Gamma', 'G_plus', 'GDI11', 'GDI12', 'GDI13', 'GDI21',
-                          'GDI22', 'GDI23', 'GDI31', 'GDI32', 'GDI33', 'GDI41', 'GDI42', 'GDI43', 'GDI51',
-                          'GDI52', 'GDI53', 'McClain_Rao', 'PBM', 'Point_Biserial', 'Ray_Turi',
-                          'Ratkowsky_Lance', 'SD_Scat', 'SD_Dis', 'Silhouette',  'Tau', 'Wemmert_Gancarski']
-        metrics_names += ['accuracy', 'f1_score', 'adjusted_rand_score', 'silhouette_sklearn', 'min_silhouette_sklearn',
-                          'complexity']
-        metrics = pd.DataFrame(metrics, columns=metrics_names+['generation'])
+        metrics = pd.DataFrame(metrics, columns=list(DICT_ALLOWED_FITNESSES.keys()) + ['generation'])
 
         pool.close()
 

@@ -52,6 +52,17 @@ class Arg(Base):
         return f'{self.name}: {self.value}'
 
 
+class Score(Base):
+    result_id = Column(Integer, ForeignKey('result.id'), nullable=False)
+    name = Column(String(64))
+    value = Column(String(64))
+
+    result = relationship("Result", back_populates="scores")
+
+    def __str__(self):
+        return f'{self.name}: {self.value}'
+
+
 class ConfusionMatrix(Base):
     result_id = Column(Integer, ForeignKey('result.id'), nullable=False)
 
@@ -115,18 +126,21 @@ class Result(Base):
     start_time = Column(DateTime)
     end_time = Column(DateTime)
 
-    accuracy = Column(Float)
-    f_measure = Column(Float)
-    adjusted_rand_score = Column(Float)
-    silhouette = Column(Float)
     initial_n_features = Column(Integer)
     final_n_features = Column(Integer)
     individual_evaluations: pd.DataFrame = Column(PickleType)
 
+    scores: List[Score] = relationship("Score", back_populates="result", uselist=True)
     args: List[Arg] = relationship("Arg", back_populates="result", uselist=True)
     confusion_matrix: ConfusionMatrix = relationship("ConfusionMatrix", uselist=False)
     selected_features: List[SelectedFeature] = relationship("SelectedFeature", uselist=True)
     result_labels: List[ClusterLabel] = relationship("ClusterLabel", uselist=True)
+
+    def args_to_dict(self):
+        return {arg.name: arg.value for arg in self.args}
+
+    def scores_to_dict(self):
+        return {score.name: score.value for score in self.scores}
 
     def details(self):
         args_str = '\n\t\t'.join(list(map(str, self.args)))

@@ -13,7 +13,8 @@ from deap import tools
 from scipy.spatial import distance
 from tqdm import tqdm
 
-from package.evaluation_functions import ALLOWED_FITNESSES, eval_features, evaluate_rate_metrics, evaluate
+from package.evaluation_functions import ALLOWED_FITNESSES, eval_features, evaluate, DICT_ALLOWED_FITNESSES, \
+    eval_multiple
 
 
 def generate(size, creator, position_minimum, position_maximum, speed_minimum, speed_maximum):
@@ -73,11 +74,9 @@ class PSOClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
     def fit(self, X, y=None):
         population_rate = math.ceil(self.pop_eval_rate * self.pop_size)
 
-        samples_dist_matrix = distance.squareform(distance.pdist(X))
-
         setup_creator(self.fitness_metric)
         toolbox = setup_toolbox(X.shape)
-        toolbox.register("evaluate", eval_features, X, self.algorithm, self.fitness_metric, samples_dist_matrix, y)
+        toolbox.register("evaluate", eval_features, X, self.algorithm, self.fitness_metric, y)
 
         pool = Pool(initializer=setup_creator, initargs=[self.fitness_metric])
         toolbox.register("map", pool.map)
@@ -86,7 +85,7 @@ class PSOClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
         ind = random.choice(range(len(population)))
         population[ind][:] = [0] * X.shape[1]
 
-        evaluate_rate_function = partial(evaluate_rate_metrics, X, y, self.algorithm, samples_dist_matrix)
+        evaluate_rate_function = partial(eval_multiple, X, y, self.algorithm, DICT_ALLOWED_FITNESSES.keys())
 
         metrics = []
         global_best = None
@@ -112,13 +111,7 @@ class PSOClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
             for particle in population:
                 toolbox.update(particle, global_best)
 
-        metrics_names = ['C_index', 'Calinski_Harabasz', 'Davies_Bouldin', 'Dunn', 'Gamma', 'G_plus', 'GDI11', 'GDI12',
-                         'GDI13', 'GDI21', 'GDI22', 'GDI23', 'GDI31', 'GDI32', 'GDI33', 'GDI41', 'GDI42', 'GDI43',
-                         'GDI51', 'GDI52', 'GDI53', 'McClain_Rao', 'PBM', 'Point_Biserial', 'Ray_Turi',
-                         'Ratkowsky_Lance', 'SD_Scat', 'SD_Dis', 'Silhouette', 'Tau', 'Wemmert_Gancarski']
-        metrics_names += ['accuracy', 'f1_score', 'adjusted_rand_score', 'silhouette_sklearn', 'min_silhouette_sklearn',
-                          'complexity']
-        metrics = pd.DataFrame(metrics, columns=metrics_names + ['generation'])
+        metrics = pd.DataFrame(metrics, columns=list(DICT_ALLOWED_FITNESSES.keys()) + ['generation'])
 
         pool.close()
 
