@@ -113,7 +113,7 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
 
         n_threads = math.floor(cpu_count() / 2)
         pool = Pool(processes=n_threads, initializer=setup_creator, initargs=[self.fitness_metric])
-        # toolbox.register("map", pool.map)
+        toolbox.register("map", pool.map)
 
         population = toolbox.population(n=self.pop_size)
         ind = random.choice(range(len(population)))
@@ -121,7 +121,7 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
             population[ind][:] = [0]*X.shape[1]
             population = list(map(partial(force_bounds, self.min_features, self.max_features), population))
 
-        evaluate_rate_function = partial(eval_multiple, X, self.algorithm, DICT_ALLOWED_FITNESSES.keys(), y)
+        evaluate_rate_function = partial(eval_multiple, X, self.algorithm, list(DICT_ALLOWED_FITNESSES.keys()), y)
 
         global_best = None
         feature_selection_rate = []

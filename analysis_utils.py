@@ -2,6 +2,7 @@ import argparse
 import csv
 import glob
 import os
+import re
 from typing import List
 
 import lasio
@@ -360,7 +361,12 @@ def export_results(args):
     df.sort_index(axis=0, level=0, inplace=True)
     df = df.groupby(level=[0, 1]).mean()
 
-    df.to_excel(args.output_file)
+    writer = pd.ExcelWriter(args.output_file)
+    for scenario, group in df.groupby(level=[1], ):
+        group.index = group.index.droplevel(level=-1)
+        sheet_name = re.sub('[^a-zA-Z,]', '', scenario)
+        group.to_excel(excel_writer=writer, sheet_name=sheet_name[:30])
+    writer.close()
 
     session.close()
 
