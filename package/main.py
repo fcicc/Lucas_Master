@@ -83,12 +83,8 @@ def run(args=None):
 
     if 'grain_size' in df.columns:
         del df['grain_size']
-    # del df['sorting']
     if 'phi stdev sorting' in df.columns:
         del df['phi stdev sorting']
-
-    # if args.beta > 1:
-    #     df = upscale_grain_size(df, args.beta)
 
     y = df['petrofacie'].values
     del df['petrofacie']
@@ -97,8 +93,6 @@ def run(args=None):
 
     dataset = dataset.reset_index(drop=True)
     dataset_matrix = dataset.values
-
-    results_ids = []
 
     ac = None
     if args.cluster_algorithm == 'agglomerative':
@@ -111,9 +105,6 @@ def run(args=None):
         ac = cluster.AffinityPropagation(preference=-250)
     elif args.cluster_algorithm == 'perfect-classifier':
         ac = CheatingClustering(y=y)
-
-    # if len(unique_labels(y)) > args.min_features:
-    #     args.min_features = len(unique_labels(y))
 
     strategy_clustering = None
     if args.strategy == 'ga':
@@ -191,11 +182,10 @@ def run(args=None):
                               start_time, end_time, cm, args, best_features, args.experiment_name,
                               strategy_clustering.metrics_, args.db_file, best_prediction)
 
-    results_ids.append(result_id)
 
-    print(f'Results stored under the ID {results_ids}')
+    print(f'Results stored under the ID {result_id}')
 
-    return results_ids
+    return result_id
 
 
 if __name__ == '__main__':
