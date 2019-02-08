@@ -294,18 +294,12 @@ def show_result(args):
 
 def filter_dataset(args):
     df: pd.DataFrame = pd.read_csv(args.input_file, index_col=0)
-    # binarized_grain_size = binaryze_column(df['Main/single size mode(mm):'])
-    # df = pd.concat([df, binarized_grain_size], axis=1)
 
     session = local_create_session(args.db_file)
 
-    columns = []
-    # try:
     result = session.query(Result).filter(Result.id == args.id[0]).first()
     columns = [selected_feature.column for selected_feature in result.selected_features]
     labels = [int(result_label.label) for result_label in result.result_labels]
-    # except AttributeError:
-    #     raise ValueError(f'Result {str(args.id)} not found in {args.db_file}')
 
     session.close()
 
