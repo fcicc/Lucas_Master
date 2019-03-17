@@ -292,26 +292,27 @@ def show_result(args):
     session.close()
 
 
-def filter_dataset(args):
-    df: pd.DataFrame = pd.read_csv(args.input_file, index_col=0)
+def filter_dataset(input_file, db_file, output_file, result_id):
 
-    session = local_create_session(args.db_file)
+    session = local_create_session(db_file)
 
-    result = session.query(Result).filter(Result.id == args.id[0]).first()
+    result = session.query(Result).filter(Result.id == result_id).first()
+    level = result.args_to_dict()['scenario']
     columns = [selected_feature.column for selected_feature in result.selected_features]
     labels = [int(result_label.label) for result_label in result.result_labels]
 
     session.close()
 
-    df = df.filter(items=columns + ['petrofacie'])
-    df['Cluster'] = pd.Series(labels, index=df.index)
-    labels = class_cluster_match(df['petrofacie'].values, labels)
-    df['Cluster label'] = pd.Series(labels, index=df.index)
+    df = pd.read_excel(input_file, index_col=0, header=[0, 1, 2])
 
-    if args.output_file:
-        df.to_csv(args.output_file, quoting=csv.QUOTE_NONNUMERIC, float_format='%.10f', index=True)
+    # df = df.filter(items=columns + ['petrofacie'])
+    others = df.xs('others', axis=1, level=0, drop_level=False)
+    df = pd.concat([df.xs(column, axis=1, level=1, drop_level=False) for column in columns] + [others], axis=1)
+
+    if output_file:
+        df.to_excel(output_file)
     else:
-        print(df)
+        return df
 
 
 def select_best(args):
@@ -390,7 +391,7 @@ def main(args=None):
     elif args.confusion_matrix:
         result = confusion_matrix(args)
     elif args.filter:
-        filter_dataset(args)
+        filter_dataset(args.input_file, args.db_file, args.output_file, args.id)
     elif args.select_best:
         select_best(args)
     elif args.plot_logs:

@@ -112,8 +112,8 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
         toolbox.register("evaluate", eval_features, X, self.algorithm, self.fitness_metric, y)
 
         n_threads = math.floor(cpu_count() / 2)
-        pool = Pool(processes=n_threads, initializer=setup_creator, initargs=[self.fitness_metric])
-        toolbox.register("map", pool.map)
+        # pool = Pool(processes=n_threads, initializer=setup_creator, initargs=[self.fitness_metric])
+        # toolbox.register("map", pool.map)
 
         population = toolbox.population(n=self.pop_size)
         ind = random.choice(range(len(population)))
@@ -127,28 +127,41 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
         feature_selection_rate = []
         evaluate(toolbox, population)
         metrics = []
-        for gen in tqdm(range(self.n_generations), desc=f'{n_threads} threads'):
-            if population_rate > 0:
-                sample_offspring = random.sample(population, population_rate)
-                sample_fits = toolbox.map(evaluate_rate_function, sample_offspring)
-                sample_fits = [metric + [gen] for metric in sample_fits]
-                metrics += sample_fits
+        gens_since_last_improvment = 0
+        with tqdm(total=self.n_generations, desc=f'{n_threads} threads', postfix={'gens_without_improv': gens_since_last_improvment}) as pbar:
+            for gen in range(self.n_generations):
+                pbar.update(1)
+                if population_rate > 0:
+                    sample_offspring = random.sample(population, population_rate)
+                    sample_fits = toolbox.map(evaluate_rate_function, sample_offspring)
+                    sample_fits = [metric + [gen] for metric in sample_fits]
+                    metrics += sample_fits
 
-            offspring = algorithms.varOr(population, toolbox, self.pop_size, cxpb=0.2, mutpb=0.8)
-            evaluate(toolbox, offspring)
+                offspring = algorithms.varOr(population, toolbox, self.pop_size, cxpb=0.2, mutpb=0.8)
+                evaluate(toolbox, offspring)
 
-            if global_best is None:
-                global_best = deepcopy(tools.selBest(offspring + population, k=1)[0])
-            else:
-                global_best = deepcopy(tools.selBest(offspring + [global_best], k=1)[0])
+                if global_best is None:
+                    global_best = deepcopy(tools.selBest(offspring + population, k=1)[0])
+                else:
+                    old_global_best = global_best
+                    global_best = deepcopy(tools.selBest(offspring + [global_best], k=1)[0])
+                    pbar.set_postfix({'gens_without_improv': gens_since_last_improvment})
+                    if gen >= 200:
+                        if all(global_best == old_global_best):
+                            gens_since_last_improvment += 1
+                        else:
+                            gens_since_last_improvment = 0
 
-            population = toolbox.select(offspring + population, k=len(population))
+                population = toolbox.select(offspring + population, k=len(population))
 
-            feature_selection_rate.append(list(map(lambda x: x / len(population), np.sum(population, axis=0))))
+                feature_selection_rate.append(list(map(lambda x: x / len(population), np.sum(population, axis=0))))
+
+                if gens_since_last_improvment >= 100:
+                    break
 
         metrics = pd.DataFrame(metrics, columns=list(DICT_ALLOWED_FITNESSES.keys()) + ['generation'])
 
-        pool.close()
+        # pool.close()
 
         self.global_best_ = global_best
         self.population_ = population

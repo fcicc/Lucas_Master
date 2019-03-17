@@ -35,12 +35,16 @@ def argument_parser(args) -> argparse.Namespace:
                         help='input CSV file')
     parser.add_argument('experiment_name', type=str, default='experiment',
                         help='name to be used in output files')
+    parser.add_argument('--level', type=str, default='features_groups', choices=['features_group', 'features'],
+                        help='input CSV file')
     parser.add_argument('--num-gen', type=int, default=500,
                         help='number of generations')
     parser.add_argument('--pop-size', type=int, default=600,
                         help='number of individuals in the population')
     parser.add_argument('-p', '--perfect', action='store_true',
                         help='whether to use the perfect evaluation as fitness function')
+    parser.add_argument('--multi-level', action='store_true',
+                        help='whether the input dataset is multi-level')
     parser.add_argument('-e', '--eval-rate', type=float, default=0,
                         help='rate of random-sampled individuals to calculate all metrics')
     parser.add_argument('--min-features', type=int, default=4,
@@ -77,12 +81,17 @@ def run(args=None):
 
     create_if_not_exists(args.db_file)
 
-    df = pd.read_excel(args.input_file, index_row=[0, 1, 2], header=[0, 1, 2])
-    df = df[args.scenario[0] + ['others']]
-    df = df.groupby(level=['features_groups'], axis=1).sum()
+    df = pd.read_excel(args.input_file, index_col=0, header=[0, 1, 2])
+    scenario = [subset for subset in args.scenario[0] if subset in df.columns.get_level_values('top_level')]
+    df = df[scenario + ['others']]
+    df = df.groupby(level=[args.level], axis=1).sum()
 
-    if 'grain_size' in df.columns:
-        del df['grain_size']
+    # if 'grain_size' in df.columns:
+    #     del df['grain_size']
+    if 'Cluster' in df.columns:
+        del df['Cluster']
+    if 'Cluster label' in df.columns:
+        del df['Cluster label']
     if 'phi stdev sorting' in df.columns:
         del df['phi stdev sorting']
 
@@ -182,10 +191,9 @@ def run(args=None):
                               start_time, end_time, cm, args, best_features, args.experiment_name,
                               strategy_clustering.metrics_, args.db_file, best_prediction)
 
-
     print(f'Results stored under the ID {result_id}')
 
-    return result_id
+    return scores, result_id
 
 
 if __name__ == '__main__':

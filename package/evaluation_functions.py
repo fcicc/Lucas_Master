@@ -25,7 +25,7 @@ CLUSTER_CRIT_ALLOWED_FITNESSES = [('C_index', -1), ('Calinski_Harabasz', 1), ('D
                                          1), ('Silhouette', 1), ('Tau', 1),
                                   ('Wemmert_Gancarski', 1)]
 ALLOWED_FITNESSES = CLUSTER_CRIT_ALLOWED_FITNESSES + \
-                    [('silhouette_sklearn', 1), ('min_silhouette_sklearn', 1),  ('DBCV', 1), ('accuracy', 1)]
+                    [('silhouette_sklearn', 1), ('min_silhouette_sklearn', 1), ('accuracy', 1)]#,  ('DBCV', 1)]
 DICT_ALLOWED_FITNESSES = dict(ALLOWED_FITNESSES)
 
 
