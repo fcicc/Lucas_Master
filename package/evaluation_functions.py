@@ -38,7 +38,7 @@ r('''
     ''')
 
 
-def eval_features(X, ac, metric, y, individual):
+def eval_features(X, ac, metric, samples_dist_matrix, y, individual):
     """Evaluate individual according to silhouette score."""
     x_individual = X * individual
     if ac is None:
@@ -47,10 +47,10 @@ def eval_features(X, ac, metric, y, individual):
         prediction = ac.fit(x_individual).labels_
 
     if metric == 'min_silhouette_sklearn':
-        index1 = np.min(silhouette_samples(x_individual, prediction))
+        index1 = np.min(silhouette_samples(X, prediction))
     elif metric == 'silhouette_sklearn':
         index1 = silhouette_score(
-            x_individual, prediction)
+            samples_dist_matrix, prediction, metric='precomputed')
     elif metric == 'DBCV':
         index1 = DBCV(x_individual, prediction)
     elif metric == 'accuracy':
