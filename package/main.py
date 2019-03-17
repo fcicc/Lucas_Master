@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import rpy2
 from rpy2.rinterface import RRuntimeWarning
+from scipy.spatial import distance
 from sklearn import cluster
 from sklearn.metrics import confusion_matrix
 from sklearn.utils.multiclass import unique_labels
@@ -182,9 +183,11 @@ def run(args=None):
     cm = confusion_matrix(y, y_prediction)
     cm = pd.DataFrame(data=cm, index=unique_labels(y), columns=unique_labels(y))
 
+    samples_dist_matrix = distance.squareform(distance.pdist(dataset_matrix))
+
     allowed_fitness = list(DICT_ALLOWED_FITNESSES.keys())
     scores = [(fitness_name, fitness_value) for fitness_name, fitness_value in
-              zip(allowed_fitness, eval_multiple(dataset_matrix, ac, allowed_fitness, y, strategy_clustering.global_best_))]
+              zip(allowed_fitness, eval_multiple(dataset_matrix, ac, allowed_fitness, samples_dist_matrix, y, strategy_clustering.global_best_))]
     scores = dict(scores)
 
     result_id = store_results(scores, initial_n_features, final_n_features,

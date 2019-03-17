@@ -67,8 +67,8 @@ def eval_features(X, ac, metric, samples_dist_matrix, y, individual):
     return index1,
 
 
-def eval_multiple(X, ac, metrics, y, individual):
-    return [eval_features(X, ac, metric, y, individual) for metric in metrics]
+def eval_multiple(X, ac, metrics, samples_dist_matrix, y, individual):
+    return [eval_features(X, ac, metric, samples_dist_matrix, y, individual) for metric in metrics]
 
 
 def non_zero_and_dist(I, J):
@@ -121,3 +121,4 @@ def evaluate(toolbox, offspring):
     fits = toolbox.map(toolbox.evaluate, offspring)
     for fit, ind in zip(fits, offspring):
         ind.fitness.values = fit
+    return offspring

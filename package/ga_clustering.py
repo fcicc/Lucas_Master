@@ -107,13 +107,15 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
     def fit(self, X, y=None):
         population_rate = math.ceil(self.pop_eval_rate * self.pop_size)
 
+        samples_dist_matrix = distance.squareform(distance.pdist(X))
+
         setup_creator(self.fitness_metric)
         toolbox = setup_toolbox(X.shape, self.min_features, self.max_features, self.algorithm, self.n_clusters)
-        toolbox.register("evaluate", eval_features, X, self.algorithm, self.fitness_metric, y)
+        toolbox.register("evaluate", eval_features, X, self.algorithm, self.fitness_metric, samples_dist_matrix, y)
 
         n_threads = math.floor(cpu_count() / 2)
-        # pool = Pool(processes=n_threads, initializer=setup_creator, initargs=[self.fitness_metric])
-        # toolbox.register("map", pool.map)
+        pool = Pool(processes=n_threads, initializer=setup_creator, initargs=[self.fitness_metric])
+        toolbox.register("map", pool.map)
 
         population = toolbox.population(n=self.pop_size)
         ind = random.choice(range(len(population)))
@@ -128,6 +130,7 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
         evaluate(toolbox, population)
         metrics = []
         gens_since_last_improvment = 0
+        current_silhouette = 0
         with tqdm(total=self.n_generations, desc=f'{n_threads} threads', postfix={'gens_without_improv': gens_since_last_improvment}) as pbar:
             for gen in range(self.n_generations):
                 pbar.update(1)
@@ -138,30 +141,29 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
                     metrics += sample_fits
 
                 offspring = algorithms.varOr(population, toolbox, self.pop_size, cxpb=0.2, mutpb=0.8)
-                evaluate(toolbox, offspring)
+                offspring = evaluate(toolbox, offspring)
 
                 if global_best is None:
                     global_best = deepcopy(tools.selBest(offspring + population, k=1)[0])
                 else:
-                    old_global_best = global_best
+                    old_global_best = deepcopy(global_best.fitness.values)
                     global_best = deepcopy(tools.selBest(offspring + [global_best], k=1)[0])
-                    pbar.set_postfix({'gens_without_improv': gens_since_last_improvment})
-                    if gen >= 200:
-                        if all(global_best == old_global_best):
-                            gens_since_last_improvment += 1
-                        else:
-                            gens_since_last_improvment = 0
+                    pbar.set_postfix({'gens_without_improv': gens_since_last_improvment, 'current_fitness': global_best.fitness.values})
+                    if old_global_best == global_best.fitness.values:
+                        gens_since_last_improvment += 1
+                    else:
+                        gens_since_last_improvment = 0
 
                 population = toolbox.select(offspring + population, k=len(population))
 
                 feature_selection_rate.append(list(map(lambda x: x / len(population), np.sum(population, axis=0))))
 
-                if gens_since_last_improvment >= 100:
+                if gens_since_last_improvment >= 200:
                     break
 
         metrics = pd.DataFrame(metrics, columns=list(DICT_ALLOWED_FITNESSES.keys()) + ['generation'])
 
-        # pool.close()
+        pool.close()
 
         self.global_best_ = global_best
         self.population_ = population
