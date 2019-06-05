@@ -45,6 +45,7 @@ def argument_parser(args) -> argparse.Namespace:
     parser.add_argument('--logs-folder', type=str, default=None)
     parser.add_argument('--plot-logs', action='store_true')
     parser.add_argument('--export-results', action='store_true')
+    parser.add_argument('--export-history', action='store_true')
 
     args = parser.parse_args(args=args)
 
@@ -54,7 +55,8 @@ def argument_parser(args) -> argparse.Namespace:
             args.average_feature_selection, args.list_results,
             args.detail_result, args.confusion_matrix,
             args.filter, args.select_best,
-            args.plot_logs, args.export_results]) != 1:
+            args.plot_logs, args.export_results,
+            args.export_history]) != 1:
         raise ValueError("Cannot have this combination of arguments.")
 
     return args
@@ -296,23 +298,31 @@ def filter_dataset(input_file, db_file, output_file, result_id):
 
     session = local_create_session(db_file)
 
-    result = session.query(Result).filter(Result.id == result_id).first()
-    level = result.args_to_dict()['scenario']
-    columns = [selected_feature.column for selected_feature in result.selected_features]
-    labels = [int(result_label.label) for result_label in result.result_labels]
-
+    results = session.query(Result).all()
+    for result in results:
+        columns = [selected_feature.column for selected_feature in result.selected_features]
+        acc = float(result.scores_to_dict()["accuracy"])
+        scenario = result.args_to_dict()["scenario"]
+        n_final = len(columns)
+        # score = n_final/n_init
+        print(f'[{result.id}]{result.name} {scenario} - {acc} {n_final}')
     session.close()
-
-    df = pd.read_excel(input_file, index_col=0, header=[0, 1, 2])
-
-    # df = df.filter(items=columns + ['petrofacie'])
-    others = df.xs('others', axis=1, level=0, drop_level=False)
-    df = pd.concat([df.xs(column, axis=1, level=1, drop_level=False) for column in columns] + [others], axis=1)
-
-    if output_file:
-        df.to_excel(output_file)
-    else:
-        return df
+    # level = result.args_to_dict()['scenario']
+    # columns = [selected_feature.column for selected_feature in result.selected_features]
+    # labels = [int(result_label.label) for result_label in result.result_labels]
+    #
+    # session.close()
+    #
+    # df = pd.read_excel(input_file, index_col=0, header=[0, 1, 2])
+    #
+    # # df = df.filter(items=columns + ['petrofacie'])
+    # others = df.xs('others', axis=1, level=0, drop_level=False)
+    # df = pd.concat([df.xs(column, axis=1, level=1, drop_level=False) for column in columns] + [others], axis=1)
+    #
+    # if output_file:
+    #     df.to_excel(output_file)
+    # else:
+    #     return df
 
 
 def select_best(args):
@@ -366,6 +376,26 @@ def export_results(args):
     session.close()
 
 
+def export_history(args):
+    session = local_create_session(args.db_file)
+    results = session.query(Result).all()
+
+    writer = pd.ExcelWriter(args.output_file)
+    for i, result in enumerate(results):
+        sheet_df = pd.DataFrame(columns=['accuracy'])
+        args = result.args_to_dict()
+        sheet_name = re.sub('[^a-zA-Z,]', '', result.name+args['scenario'])
+        sheet_name = str(i) + sheet_name
+
+        for gen, generation_group in result.individual_evaluations.groupby(['generation'], sort=False):
+            sheet_df.loc[gen] = [max(generation_group['accuracy'])[0]]
+
+        sheet_df.to_excel(excel_writer=writer, sheet_name=sheet_name[:30])
+    writer.close()
+
+    session.close()
+
+
 def main(args=None):
     args = argument_parser(args)
 
@@ -398,6 +428,8 @@ def main(args=None):
         plot_logs(args)
     elif args.export_results:
         export_results(args)
+    elif args.export_history:
+        export_history(args)
 
     return result
 

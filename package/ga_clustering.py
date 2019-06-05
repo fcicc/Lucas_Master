@@ -123,7 +123,8 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
             population[ind][:] = [0]*X.shape[1]
             population = list(map(partial(force_bounds, self.min_features, self.max_features), population))
 
-        evaluate_rate_function = partial(eval_multiple, X, self.algorithm, list(DICT_ALLOWED_FITNESSES.keys()), y)
+        evaluate_rate_methods = ['accuracy']
+        evaluate_rate_function = partial(eval_multiple, X, self.algorithm, evaluate_rate_methods, samples_dist_matrix, y)
 
         global_best = None
         feature_selection_rate = []
@@ -161,7 +162,7 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
                 if gens_since_last_improvment >= 200:
                     break
 
-        metrics = pd.DataFrame(metrics, columns=list(DICT_ALLOWED_FITNESSES.keys()) + ['generation'])
+        metrics = pd.DataFrame(metrics, columns=evaluate_rate_methods + ['generation'])
 
         pool.close()
 

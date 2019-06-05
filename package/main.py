@@ -155,6 +155,8 @@ def run(args=None):
     if type(ac) == cluster.KMeans:
         ac = cluster.KMeans(n_clusters=len(unique_labels(y)), n_init=100)
 
+    best_features = []
+    best_prediction = []
     if args.dont_use_ga:
         best_features = dataset.columns.values
         best_prediction = strategy_clustering.labels_
@@ -183,11 +185,19 @@ def run(args=None):
     cm = confusion_matrix(y, y_prediction)
     cm = pd.DataFrame(data=cm, index=unique_labels(y), columns=unique_labels(y))
 
+    best_phenotype = []
+    for feature in dataset.columns.values:
+        if feature in best_features:
+            best_phenotype += [1]
+        else:
+            best_phenotype += [0]
+
     samples_dist_matrix = distance.squareform(distance.pdist(dataset_matrix))
 
     allowed_fitness = list(DICT_ALLOWED_FITNESSES.keys())
     scores = [(fitness_name, fitness_value) for fitness_name, fitness_value in
-              zip(allowed_fitness, eval_multiple(dataset_matrix, ac, allowed_fitness, samples_dist_matrix, y, strategy_clustering.global_best_))]
+              zip(allowed_fitness, eval_multiple(dataset_matrix, ac, allowed_fitness, samples_dist_matrix, y,
+                                                 best_phenotype))]
     scores = dict(scores)
 
     result_id = store_results(scores, initial_n_features, final_n_features,
