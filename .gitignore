@@ -110,11 +110,10 @@ ENV/
 .vscode
 *.jpg
 *.png
+
 test_scenario
 petrel
-
 *.db
-
 execute_dataset_analysis.py
-
 datasets*
+petroledge_model.owl
