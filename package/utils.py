@@ -1,5 +1,5 @@
+from scipy.optimize import linear_sum_assignment
 from sklearn.metrics.cluster import contingency_matrix
-from sklearn.utils.linear_assignment_ import linear_assignment
 from sklearn.utils.multiclass import unique_labels
 
 
@@ -39,7 +39,7 @@ def class_cluster_match(y_true, y_pred):
         clusters += ['DEF_CLUSTER' + str(i) for i in range(n_classes - n_clusters)]
 
     C = contingency_matrix(y_true, y_pred)
-    true_idx, pred_idx = linear_assignment(-C).T
+    true_idx, pred_idx = linear_sum_assignment(-C)
 
     true_idx = true_idx.tolist()
     pred_idx = pred_idx.tolist()

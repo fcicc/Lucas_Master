@@ -13,7 +13,7 @@ from sklearn.utils.multiclass import unique_labels
 
 from package.CheatingClustering import CheatingClustering
 from package.coclustering import CoClustering
-from package.evaluation_functions import eval_features, DICT_ALLOWED_FITNESSES, eval_multiple
+from package.evaluation_functions import DICT_ALLOWED_FITNESSES, eval_multiple
 from package.ga_clustering import ALLOWED_FITNESSES, GAClustering
 from package.orm_interface import store_results
 from package.orm_models import create_if_not_exists
@@ -63,7 +63,8 @@ def argument_parser(args) -> argparse.Namespace:
                         help='sqlite file to store results')
     parser.add_argument('-s', '--strategy', type=str, default='ga',
                         help='ga(Genetic Algorithm) or PSO (Particle Swarm Optimization)', choices=['ga', 'pso',
-                                                                                                    'ward_p', 'random_ga'])
+                                                                                                    'ward_p',
+                                                                                                    'random_ga'])
     parser.add_argument('--p_ward', type=float, default=2,
                         help='Ward P exponential value')
     parser.add_argument('--scenario', nargs='+', help='List of scenarios of features to be used', required=True)
@@ -104,79 +105,79 @@ def run(args=None):
     dataset = dataset.reset_index(drop=True)
     dataset_matrix = dataset.values
 
-    ac = None
+    clustering_algorithm = None
     if args.cluster_algorithm == 'agglomerative':
-        ac = cluster.AgglomerativeClustering(n_clusters=len(unique_labels(y)),
-                                             # affinity=custom_distance,
-                                             linkage='ward')
+        clustering_algorithm = cluster.AgglomerativeClustering(n_clusters=len(unique_labels(y)),
+                                                               linkage='ward')
     elif args.cluster_algorithm == 'kmeans':
-        ac = cluster.KMeans(n_clusters=len(unique_labels(y)), n_init=10)
+        clustering_algorithm = cluster.KMeans(n_clusters=len(unique_labels(y)), n_init=10)
     elif args.cluster_algorithm == 'affinity-propagation':
-        ac = cluster.AffinityPropagation(preference=-250)
+        clustering_algorithm = cluster.AffinityPropagation(preference=-250)
     elif args.cluster_algorithm == 'perfect-classifier':
-        ac = CheatingClustering(y=y)
+        clustering_algorithm = CheatingClustering(y=y)
 
-    strategy_clustering = None
+    meta_clustering = None
     if args.strategy == 'ga':
-        strategy_clustering = GAClustering(algorithm=ac, n_generations=args.num_gen, perfect=args.perfect,
-                                           min_features=args.min_features, max_features=args.max_features,
-                                           fitness_metric=args.fitness_metric, pop_size=args.pop_size,
-                                           pop_eval_rate=args.eval_rate)
+        meta_clustering = GAClustering(algorithm=clustering_algorithm, n_generations=args.num_gen, perfect=args.perfect,
+                                       min_features=args.min_features, max_features=args.max_features,
+                                       fitness_metric=args.fitness_metric, pop_size=args.pop_size,
+                                       pop_eval_rate=args.eval_rate)
     elif args.strategy == 'random_ga':
-        strategy_clustering = GAClustering(algorithm=None, n_generations=args.num_gen, perfect=args.perfect,
-                                           min_features=args.min_features, max_features=args.max_features,
-                                           fitness_metric=args.fitness_metric, pop_size=args.pop_size,
-                                           pop_eval_rate=args.eval_rate, n_clusters=len(unique_labels(y)))
+        meta_clustering = GAClustering(algorithm=None, n_generations=args.num_gen, perfect=args.perfect,
+                                       min_features=args.min_features, max_features=args.max_features,
+                                       fitness_metric=args.fitness_metric, pop_size=args.pop_size,
+                                       pop_eval_rate=args.eval_rate, n_clusters=len(unique_labels(y)))
     elif args.strategy == 'pso':
-        strategy_clustering = PSOClustering(algorithm=ac, n_generations=args.num_gen, perfect=args.perfect,
-                                            fitness_metric=args.fitness_metric, pop_size=args.pop_size,
-                                            pop_eval_rate=args.eval_rate)
+        meta_clustering = PSOClustering(algorithm=clustering_algorithm, n_generations=args.num_gen,
+                                        perfect=args.perfect,
+                                        fitness_metric=args.fitness_metric, pop_size=args.pop_size,
+                                        pop_eval_rate=args.eval_rate)
     elif args.strategy == 'cocluster':
-        strategy_clustering = CoClustering(algorithm=ac, n_generations=args.num_gen, perfect=args.perfect,
-                                           fitness_metric=args.fitness_metric, pop_size=args.pop_size,
-                                           pop_eval_rate=args.eval_rate)
+        meta_clustering = CoClustering(algorithm=clustering_algorithm, n_generations=args.num_gen, perfect=args.perfect,
+                                       fitness_metric=args.fitness_metric, pop_size=args.pop_size,
+                                       pop_eval_rate=args.eval_rate)
     elif args.strategy == 'ward_p':
         kernel_feature = df['porosity'].values
         np.delete(dataset_matrix, df.columns.get_loc('porosity'))
         del df['porosity']
-        strategy_clustering = WardP(perfect=args.perfect, kernel_feature=kernel_feature, p=args.p_ward,
-                                    n_clusters=len(unique_labels(y)))
+        meta_clustering = WardP(perfect=args.perfect, kernel_feature=kernel_feature, p=args.p_ward,
+                                n_clusters=len(unique_labels(y)))
 
     if args.dont_use_ga:
-        strategy_clustering = ac
+        meta_clustering = clustering_algorithm
 
     start_time = datetime.datetime.now()
     if args.eval_rate:
-        strategy_clustering.fit(dataset_matrix, y=y)
+        meta_clustering.fit(dataset_matrix, y=y)
     else:
-        strategy_clustering.fit(dataset_matrix)
+        meta_clustering.fit(dataset_matrix)
     end_time = datetime.datetime.now()
 
-    if type(ac) == cluster.KMeans:
-        ac = cluster.KMeans(n_clusters=len(unique_labels(y)), n_init=100)
+    if type(clustering_algorithm) == cluster.KMeans:
+        clustering_algorithm = cluster.KMeans(n_clusters=len(unique_labels(y)), n_init=100)
 
     best_features = []
     best_prediction = []
     if args.dont_use_ga:
         best_features = dataset.columns.values
-        best_prediction = strategy_clustering.labels_
-        strategy_clustering.metrics_ = ''
+        best_prediction = meta_clustering.labels_
+        meta_clustering.metrics_ = ''
     elif args.strategy == 'pso':
-        best_weights = strategy_clustering.global_best_
-        best_prediction = ac.fit(dataset.values*best_weights).labels_
+        best_weights = meta_clustering.global_best_
+        best_prediction = clustering_algorithm.fit(dataset.values * best_weights).labels_
         best_features = dataset.columns.values
     elif args.strategy == 'ga':
-        best_features = [col for col, boolean in zip(dataset.columns.values, strategy_clustering.global_best_)
+        best_features = [col for col, boolean in zip(dataset.columns.values, meta_clustering.global_best_)
                          if boolean]
-        best_prediction = ac.fit(dataset[best_features]).labels_
+        best_prediction = clustering_algorithm.fit(dataset[best_features]).labels_
     elif args.strategy == 'ward_p':
         best_features = dataset.columns.values
-        best_prediction = strategy_clustering.labels_
-        strategy_clustering.metrics_ = ''
+        best_prediction = meta_clustering.labels_
+        meta_clustering.metrics_ = ''
     elif args.strategy == 'random_ga':
         best_features = dataset.columns.values
-        best_prediction = strategy_clustering.global_best_
-        strategy_clustering.metrics_ = ''
+        best_prediction = meta_clustering.global_best_
+        meta_clustering.metrics_ = ''
 
     initial_n_features = dataset_matrix.shape[1]
     final_n_features = len(best_features)
@@ -196,13 +197,14 @@ def run(args=None):
 
     allowed_fitness = list(DICT_ALLOWED_FITNESSES.keys())
     scores = [(fitness_name, fitness_value) for fitness_name, fitness_value in
-              zip(allowed_fitness, eval_multiple(dataset_matrix, ac, allowed_fitness, samples_dist_matrix, y,
-                                                 best_phenotype))]
+              zip(allowed_fitness,
+                  eval_multiple(dataset_matrix, clustering_algorithm, allowed_fitness, samples_dist_matrix, y,
+                                best_phenotype))]
     scores = dict(scores)
 
     result_id = store_results(scores, initial_n_features, final_n_features,
                               start_time, end_time, cm, args, best_features, args.experiment_name,
-                              strategy_clustering.metrics_, args.db_file, best_prediction)
+                              meta_clustering.metrics_, args.db_file, best_prediction)
 
     print(f'Results stored under the ID {result_id}')
 

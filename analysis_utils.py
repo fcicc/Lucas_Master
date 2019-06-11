@@ -5,7 +5,6 @@ import os
 import re
 from typing import List
 
-import lasio
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -14,7 +13,6 @@ from sqlalchemy import asc
 from sqlalchemy.exc import OperationalError
 
 from package.orm_models import Result, local_create_session
-from package.utils import class_cluster_match
 
 
 def argument_parser(args) -> argparse.Namespace:
@@ -202,14 +200,7 @@ def merge_results(args):
 
 
 def plot_logs(args):
-    las_files = glob.glob(f'{args.logs_folder}/*.las')
-    las_files = list(map(lasio.read, las_files))
-
-    for las in las_files:
-        if len(las.curves) > 2:
-            las.df().plot()
-
-    plt.show()
+    raise NotImplementedError()
 
 
 def correct_wells_names(well_name):

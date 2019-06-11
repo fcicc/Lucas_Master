@@ -1,36 +1,29 @@
 """Genetic algorithm clustering by hard subspace."""
 
 import argparse
-import csv
+import copy
 import logging
 import multiprocessing
 import os
 import random
+import re
 import sys
 import time
-import re
 import warnings
-import copy
+from multiprocessing.pool import Pool
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
-
-from functools import partial
-from multiprocessing.pool import Pool
-from deap import algorithms, base, creator, tools
+from deap import base, creator, tools
+from scipy.spatial import distance
 from sklearn import cluster
-from sklearn.metrics import (accuracy_score, adjusted_rand_score,
-                             calinski_harabaz_score, confusion_matrix,
-                             f1_score, silhouette_score)
-from sklearn.metrics.cluster import class_cluster_match
-from sklearn.mixture import GaussianMixture
-from sklearn.utils.multiclass import unique_labels
+from sklearn.metrics import (adjusted_rand_score)
 from sklearn.mixture import GaussianMixture
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
-from scipy.spatial import distance
+from sklearn.utils.multiclass import unique_labels
 from tqdm import tqdm
 
 logging.getLogger().setLevel(logging.INFO)
@@ -42,7 +35,7 @@ def eval_host(X, samples_dist_matrix, cs):
     for i, symbiont in enumerate(cs):
         for mean, _, attr in symbiont:
             host_centers[i, attr] = mean
-    
+
     # dist_matrix = distance.cdist(host_centers, X)
     # assigned_centers = np.argmin(dist_matrix, axis=0)
     # dist_to_closest_centers = [min(col) for col in dist_matrix.T]
@@ -58,8 +51,6 @@ def eval_host(X, samples_dist_matrix, cs):
     #             connectivity += 1/(j+1)
 
     # return compactness, connectivity
-
-
 
 
 def feature_relevance(X, y):
@@ -127,7 +118,7 @@ def extract_subtotals(X):
         for i, attribute in enumerate(feature_attrs):
             if attribute not in attributes[big_group][i]:
                 attributes[big_group][i][attribute] = [0 for _ in range(X.shape[0])]
-    
+
     for i, row in enumerate(X.iterrows()):
         for feature in compositional_features:
             if row[1][feature] > 0:
@@ -141,12 +132,13 @@ def extract_subtotals(X):
     for big_group in attributes:
         for position, features in enumerate(attributes[big_group]):
             for attribute in features:
-                df['['+big_group+']'+str(position)+'-'+attribute] = features[attribute]
+                df['[' + big_group + ']' + str(position) + '-' + attribute] = features[attribute]
 
     df = pd.DataFrame.from_dict(df)
 
     return df
-    
+
+
 def estimate_n_clusters(X):
     "Find the best number of clusters through maximization of the log-likelihood from EM."
     last_log_likelihood = None
@@ -170,10 +162,10 @@ def estimate_n_clusters(X):
 
         if last_log_likelihood is None:
             last_log_likelihood = avg_log_likelihood
-        elif avg_log_likelihood+10E-6 <= last_log_likelihood:
-            return n_components-1
+        elif avg_log_likelihood + 10E-6 <= last_log_likelihood:
+            return n_components - 1
         last_log_likelihood = avg_log_likelihood
-    
+
 
 def dynamic_GM_means(X):
     """Dynamically calculate gaussian means for the input data."""
@@ -186,10 +178,11 @@ def dynamic_GM_means(X):
 def cluster_grid_generation(X, pool):
     """Generate clusters grid from S-ESC."""
     cluster_1d_grid = []
-    cols = [X[:,i].reshape(X[:,i].shape[0], 1)for i in range(X.shape[1])]
+    cols = [X[:, i].reshape(X[:, i].shape[0], 1) for i in range(X.shape[1])]
     cluster_1d_grid = pool.map(dynamic_GM_means, cols)
 
-    cluster_1d_grid = [(mean, index, attr) for attr, cluster in enumerate(cluster_1d_grid) for index, mean in enumerate(cluster)]
+    cluster_1d_grid = [(mean, index, attr) for attr, cluster in enumerate(cluster_1d_grid) for index, mean in
+                       enumerate(cluster)]
 
     return cluster_1d_grid
 
@@ -208,8 +201,8 @@ def slm(individual, cc_population):
         individual.remove(random.choice(individual))
         individual.append(random.choice(cc_population))
 
-        prob = prob/10
-    
+        prob = prob / 10
+
     return individual
 
 
@@ -227,14 +220,14 @@ def mlm(symbiont, cluster_1d_grid):
         symbiont.remove(random.choice(symbiont))
         symbiont.append(random.choice(cluster_1d_grid))
 
-        prob = prob/10
-    
+        prob = prob / 10
+
     return symbiont
 
 
 def clear_cc_population(cc_population, cs_population):
     """Eliminate symbionts not referenced by any host."""
-    keep_cc_s = [False]*len(cc_population)
+    keep_cc_s = [False] * len(cc_population)
 
     for host in cs_population:
         for symbiont in host:
@@ -247,15 +240,15 @@ def clear_cc_population(cc_population, cs_population):
 
 def pick_random_means(cluster_1d_grid, min, max):
     """Select non-repeated means in non-repeated features."""
-    n_attrs = int(np.ceil(random.random()*(max-min))+min)
+    n_attrs = int(np.ceil(random.random() * (max - min)) + min)
     means = []
     for _ in range(n_attrs):
         means.append(random.choice([mean for mean in cluster_1d_grid if mean[2] not in [attr for _, _, attr in means]]))
-        
+
     return means
 
 
-def host_pred(host, X):   
+def host_pred(host, X):
     host_centers = np.zeros((len(host), X.shape[1]))
     for i, symbiont in enumerate(host):
         for mean, _, attr in symbiont:
@@ -303,10 +296,7 @@ def main():
 
     samples_dist_matrix = distance.squareform(distance.pdist(X_matrix))
 
-
-    ac = cluster.AgglomerativeClustering(n_clusters=args.n_clusters,
-                                         affinity='manhattan',
-                                         linkage='complete')
+    ac = cluster.AgglomerativeClustering(n_clusters=args.n_clusters, affinity='manhattan', linkage='complete')
 
     logging.info('Step 1')
     cluster_1d_grid = cluster_grid_generation(X_matrix, pool)
@@ -334,7 +324,7 @@ def main():
         tools.initRepeat,
         creator.individual,
         toolbox.clstr_sol,
-        n=int(np.ceil(random.random()*4+8)))
+        n=int(np.ceil(random.random() * 4 + 8)))
     toolbox.register("cs_population", tools.initRepeat, list, toolbox.host)
     cs_population = toolbox.cs_population(n=args.cs_pop_size)
 
@@ -357,7 +347,6 @@ def main():
         parent_hosts = toolbox.select_parent_host(cs_population, k=args.cs_pop_size)
         # logging.info('Step 5.a')
         for parent_host in parent_hosts:
-    
             # logging.info('Step 5.a.ii')
             cloned_host = copy.deepcopy(parent_host)
 
@@ -383,7 +372,7 @@ def main():
             ind.fitness.values = fit
 
         # logging.info('Step 5.c, Step 5.d')
-        cs_population = toolbox.select_host(cs_population+cs_offspring, k=len(cs_population))
+        cs_population = toolbox.select_host(cs_population + cs_offspring, k=len(cs_population))
 
         # logging.info('Step 5.e (Step 5.f ignored)')
         cc_population = clear_cc_population(cc_population, cs_population)
@@ -430,6 +419,7 @@ def main():
     sns.regplot(x='position_in_nsga', y='front_adj_rand', data=objective_space)
 
     plt.show()
+
 
 if __name__ == '__main__':
     main()
