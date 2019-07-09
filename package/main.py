@@ -16,7 +16,7 @@ from package.coclustering import CoClustering
 from package.evaluation_functions import DICT_ALLOWED_FITNESSES, eval_multiple
 from package.ga_clustering import ALLOWED_FITNESSES, GAClustering
 from package.orm_interface import store_results
-from package.orm_models import create_if_not_exists
+from package.orm_models import create_db_if_not_exists
 from package.pso_clustering import PSOClustering
 from package.utils import class_cluster_match
 from package.ward_p import WardP
@@ -66,9 +66,7 @@ def argument_parser(args) -> argparse.Namespace:
 
     args = parser.parse_args(args=args)
 
-    if args.fitness_metric not in [fit[0] for fit in ALLOWED_FITNESSES]:
-        raise ValueError(args.fitness_metric +
-                         ' is not an acceptable fitness metric')
+    assert args.fitness_metric in [fit[0] for fit in ALLOWED_FITNESSES]
 
     return args
 
@@ -76,80 +74,33 @@ def argument_parser(args) -> argparse.Namespace:
 def run(args=None):
     args = argument_parser(args)
 
-    create_if_not_exists(args.db_file)
+    create_db_if_not_exists(args.db_file)
 
-    df = pd.read_excel(args.input_file, index_col=0, header=[0, 1, 2])
-    scenario = [subset for subset in args.scenario[0] if subset in df.columns.get_level_values('top_level')]
-    df = df[scenario + ['others']]
-    df = df.groupby(level=[args.level], axis=1).sum()
+    dataset, y = parse_excel_dataset_to_df(args)
 
-    # if 'grain_size' in df.columns:
-    #     del df['grain_size']
-    if 'Cluster' in df.columns:
-        del df['Cluster']
-    if 'Cluster label' in df.columns:
-        del df['Cluster label']
-    if 'phi stdev sorting' in df.columns:
-        del df['phi stdev sorting']
+    clustering_algorithm = select_clustering_algorithm(args, y)
 
-    y = df['petrofacie'].values
-    del df['petrofacie']
-
-    dataset = df
-
-    dataset = dataset.reset_index(drop=True)
-    dataset_matrix = dataset.values
-
-    clustering_algorithm = None
-    if args.cluster_algorithm == 'agglomerative':
-        clustering_algorithm = cluster.AgglomerativeClustering(n_clusters=len(unique_labels(y)),
-                                                               linkage='ward')
-    elif args.cluster_algorithm == 'kmeans':
-        clustering_algorithm = cluster.KMeans(n_clusters=len(unique_labels(y)), n_init=10)
-    elif args.cluster_algorithm == 'affinity-propagation':
-        clustering_algorithm = cluster.AffinityPropagation(preference=-250)
-    elif args.cluster_algorithm == 'perfect-classifier':
-        clustering_algorithm = CheatingClustering(y=y)
-
-    meta_clustering = None
-    if args.strategy == 'ga':
-        meta_clustering = GAClustering(algorithm=clustering_algorithm, n_generations=args.num_gen, perfect=args.perfect,
-                                       min_features=args.min_features,
-                                       fitness_metric=args.fitness_metric, pop_size=args.pop_size,
-                                       pop_eval_rate=args.eval_rate)
-    elif args.strategy == 'random_ga':
-        meta_clustering = GAClustering(algorithm=None, n_generations=args.num_gen, perfect=args.perfect,
-                                       min_features=args.min_features,
-                                       fitness_metric=args.fitness_metric, pop_size=args.pop_size,
-                                       pop_eval_rate=args.eval_rate, n_clusters=len(unique_labels(y)))
-    elif args.strategy == 'pso':
-        meta_clustering = PSOClustering(algorithm=clustering_algorithm, n_generations=args.num_gen,
-                                        perfect=args.perfect,
-                                        fitness_metric=args.fitness_metric, pop_size=args.pop_size,
-                                        pop_eval_rate=args.eval_rate)
-    elif args.strategy == 'cocluster':
-        meta_clustering = CoClustering(algorithm=clustering_algorithm, n_generations=args.num_gen, perfect=args.perfect,
-                                       fitness_metric=args.fitness_metric, pop_size=args.pop_size,
-                                       pop_eval_rate=args.eval_rate)
-    elif args.strategy == 'ward_p':
-        kernel_feature = df['porosity'].values
-        np.delete(dataset_matrix, df.columns.get_loc('porosity'))
-        del df['porosity']
-        meta_clustering = WardP(perfect=args.perfect, kernel_feature=kernel_feature, p=args.p_ward,
-                                n_clusters=len(unique_labels(y)))
-    elif args.strategy == 'none':
-        meta_clustering = clustering_algorithm
+    meta_clustering = select_meta_clustering_algorithm(args, clustering_algorithm, dataset, y)
 
     start_time = datetime.datetime.now()
     if args.eval_rate:
-        meta_clustering.fit(dataset_matrix, y=y)
+        meta_clustering.fit(dataset.values, y=y)
     else:
-        meta_clustering.fit(dataset_matrix)
+        meta_clustering.fit(dataset.values)
     end_time = datetime.datetime.now()
 
     if type(clustering_algorithm) == cluster.KMeans:
         clustering_algorithm = cluster.KMeans(n_clusters=len(unique_labels(y)), n_init=100)
 
+    result_id, scores = save_output_to_db(args, clustering_algorithm, dataset, end_time,
+                                          meta_clustering, start_time, y)
+
+    print(f'Results stored under the ID {result_id}')
+
+    return scores, result_id
+
+
+def save_output_to_db(args, clustering_algorithm, dataset, end_time, meta_clustering, start_time, y):
     best_features = []
     best_prediction = []
     if args.strategy == 'none':
@@ -172,37 +123,96 @@ def run(args=None):
         best_features = dataset.columns.values
         best_prediction = meta_clustering.global_best_
         meta_clustering.metrics_ = ''
-
-    initial_n_features = dataset_matrix.shape[1]
+    initial_n_features = dataset.values.shape[1]
     final_n_features = len(best_features)
-
     y_prediction = class_cluster_match(y, best_prediction)
     cm = confusion_matrix(y, y_prediction)
     cm = pd.DataFrame(data=cm, index=unique_labels(y), columns=unique_labels(y))
-
     best_phenotype = []
     for feature in dataset.columns.values:
         if feature in best_features:
             best_phenotype += [1]
         else:
             best_phenotype += [0]
-
-    samples_dist_matrix = distance.squareform(distance.pdist(dataset_matrix))
-
+    samples_dist_matrix = distance.squareform(distance.pdist(dataset.values))
     allowed_fitness = list(DICT_ALLOWED_FITNESSES.keys())
     scores = [(fitness_name, fitness_value) for fitness_name, fitness_value in
               zip(allowed_fitness,
-                  eval_multiple(dataset_matrix, clustering_algorithm, allowed_fitness, samples_dist_matrix, y,
+                  eval_multiple(dataset.values, clustering_algorithm, allowed_fitness, samples_dist_matrix, y,
                                 best_phenotype))]
     scores = dict(scores)
-
     result_id = store_results(scores, initial_n_features, final_n_features,
                               start_time, end_time, cm, args, best_features, args.experiment_name,
                               meta_clustering.metrics_, args.db_file, best_prediction)
+    return result_id, scores
 
-    print(f'Results stored under the ID {result_id}')
 
-    return scores, result_id
+def select_meta_clustering_algorithm(args, clustering_algorithm, dataset, y):
+    meta_clustering = None
+    if args.strategy == 'ga':
+        meta_clustering = GAClustering(algorithm=clustering_algorithm, n_generations=args.num_gen, perfect=args.perfect,
+                                       min_features=args.min_features,
+                                       fitness_metric=args.fitness_metric, pop_size=args.pop_size,
+                                       pop_eval_rate=args.eval_rate)
+    elif args.strategy == 'random_ga':
+        meta_clustering = GAClustering(algorithm=None, n_generations=args.num_gen, perfect=args.perfect,
+                                       min_features=args.min_features,
+                                       fitness_metric=args.fitness_metric, pop_size=args.pop_size,
+                                       pop_eval_rate=args.eval_rate, n_clusters=len(unique_labels(y)))
+    elif args.strategy == 'pso':
+        meta_clustering = PSOClustering(algorithm=clustering_algorithm, n_generations=args.num_gen,
+                                        perfect=args.perfect,
+                                        fitness_metric=args.fitness_metric, pop_size=args.pop_size,
+                                        pop_eval_rate=args.eval_rate)
+    elif args.strategy == 'cocluster':
+        meta_clustering = CoClustering(algorithm=clustering_algorithm, n_generations=args.num_gen, perfect=args.perfect,
+                                       fitness_metric=args.fitness_metric, pop_size=args.pop_size,
+                                       pop_eval_rate=args.eval_rate)
+    elif args.strategy == 'ward_p':
+        kernel_feature = dataset['porosity'].values
+        np.delete(dataset.values, dataset.columns.get_loc('porosity'))
+        del dataset['porosity']
+        meta_clustering = WardP(perfect=args.perfect, kernel_feature=kernel_feature, p=args.p_ward,
+                                n_clusters=len(unique_labels(y)))
+    elif args.strategy == 'none':
+        meta_clustering = clustering_algorithm
+    assert meta_clustering is not None
+    return meta_clustering
+
+
+def select_clustering_algorithm(args, y):
+    clustering_algorithm = None
+    if args.cluster_algorithm == 'agglomerative':
+        clustering_algorithm = cluster.AgglomerativeClustering(n_clusters=len(unique_labels(y)),
+                                                               linkage='ward')
+    elif args.cluster_algorithm == 'kmeans':
+        clustering_algorithm = cluster.KMeans(n_clusters=len(unique_labels(y)), n_init=10)
+    elif args.cluster_algorithm == 'affinity-propagation':
+        clustering_algorithm = cluster.AffinityPropagation(preference=-250)
+    elif args.cluster_algorithm == 'perfect-classifier':
+        clustering_algorithm = CheatingClustering(y=y)
+    assert clustering_algorithm is not None
+    return clustering_algorithm
+
+
+def parse_excel_dataset_to_df(args):
+    df = pd.read_excel(args.input_file, index_col=0, header=[0, 1, 2])
+    scenario = [subset for subset in args.scenario[0] if subset in df.columns.get_level_values('top_level')]
+    df = df[scenario + ['others']]
+    df = df.groupby(level=[args.level], axis=1).sum()
+
+    # if 'grain_size' in df.columns:
+    #     del df['grain_size']
+    if 'Cluster' in df.columns:
+        del df['Cluster']
+    if 'Cluster label' in df.columns:
+        del df['Cluster label']
+    if 'phi stdev sorting' in df.columns:
+        del df['phi stdev sorting']
+    y = df['petrofacie'].values
+    del df['petrofacie']
+    df = df.reset_index(drop=True)
+    return df, y
 
 
 if __name__ == '__main__':

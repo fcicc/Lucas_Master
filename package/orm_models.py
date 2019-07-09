@@ -16,7 +16,7 @@ def local_create_engine(db_file):
     return create_engine(get_conn_string(db_file), echo=False)
 
 
-def create_if_not_exists(db_file):
+def create_db_if_not_exists(db_file):
     engine = local_create_engine(db_file)
     Base.metadata.create_all(engine)
 
