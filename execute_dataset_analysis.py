@@ -1,5 +1,6 @@
 import os
 from itertools import chain
+
 from package.main import run
 
 
@@ -17,8 +18,15 @@ def main():
         '--cluster-algorithm': 'agglomerative'
     }
 
+    datasets_folder = './datasets/'
     dataset_locations = {
-        'dastaset_name': './dataset/path/'
+        'campus_basin': datasets_folder + '/CampusBasin/subtotals_dataset.xlsx',
+        'equatorial_margin': datasets_folder + '/MargemEquatorial/subtotals_dataset.xlsx',
+        'talara_basin': datasets_folder + '/TalaraBasin/subtotals_dataset.xlsx',
+        # 'carmopolis':        datasets_folder + '/Carmopolis/subtotals_dataset.xlsx',
+        'carmopolisGrouped': datasets_folder + '/CarmopolisGrouped/subtotals_dataset.xlsx',
+        'jequitinhonha': datasets_folder + '/Jequitinhonha/subtotals_dataset.xlsx',
+        'mucuri': datasets_folder + '/Mucuri/subtotals_dataset.xlsx'
     }
 
     for name, dataset_file in dataset_locations.items():

@@ -44,27 +44,22 @@ def argument_parser(args) -> argparse.Namespace:
                         help='number of individuals in the population')
     parser.add_argument('-p', '--perfect', action='store_true',
                         help='whether to use the perfect evaluation as fitness function')
-    parser.add_argument('--multi-level', action='store_true',
-                        help='whether the input dataset is multi-level')
     parser.add_argument('-e', '--eval-rate', type=float, default=0,
                         help='rate of random-sampled individuals to calculate all metrics')
     parser.add_argument('--min-features', type=int, default=4,
                         help='minimum number of features to be considered')
-    parser.add_argument('--max-features', type=int, default=50,
-                        help='maximum number of features to be considered')
     parser.add_argument('--fitness-metric', type=str, default='silhouette_sklearn',
                         help='fitness function to be used', choices=[fitnes_str for fitnes_str, _ in ALLOWED_FITNESSES])
     parser.add_argument('--cluster-algorithm', type=str, default='agglomerative',
                         help='cluster algorithm to be used', choices=['agglomerative', 'kmeans',
                                                                       'affinity-propagation', 'perfect-classifier'])
-    parser.add_argument('-d', '--dont-use-ga', action='store_true',
-                        help='disables the use of GA and apply cluster to all dimensions')
     parser.add_argument('-o', '--db-file', type=str, default='./local.db',
                         help='sqlite file to store results')
-    parser.add_argument('-s', '--strategy', type=str, default='ga',
+    parser.add_argument('-s', '--strategy', type=str, default='none',
                         help='ga(Genetic Algorithm) or PSO (Particle Swarm Optimization)', choices=['ga', 'pso',
                                                                                                     'ward_p',
-                                                                                                    'random_ga'])
+                                                                                                    'random_ga',
+                                                                                                    'none'])
     parser.add_argument('--p_ward', type=float, default=2,
                         help='Ward P exponential value')
     parser.add_argument('--scenario', nargs='+', help='List of scenarios of features to be used', required=True)
@@ -119,12 +114,12 @@ def run(args=None):
     meta_clustering = None
     if args.strategy == 'ga':
         meta_clustering = GAClustering(algorithm=clustering_algorithm, n_generations=args.num_gen, perfect=args.perfect,
-                                       min_features=args.min_features, max_features=args.max_features,
+                                       min_features=args.min_features,
                                        fitness_metric=args.fitness_metric, pop_size=args.pop_size,
                                        pop_eval_rate=args.eval_rate)
     elif args.strategy == 'random_ga':
         meta_clustering = GAClustering(algorithm=None, n_generations=args.num_gen, perfect=args.perfect,
-                                       min_features=args.min_features, max_features=args.max_features,
+                                       min_features=args.min_features,
                                        fitness_metric=args.fitness_metric, pop_size=args.pop_size,
                                        pop_eval_rate=args.eval_rate, n_clusters=len(unique_labels(y)))
     elif args.strategy == 'pso':
@@ -142,8 +137,7 @@ def run(args=None):
         del df['porosity']
         meta_clustering = WardP(perfect=args.perfect, kernel_feature=kernel_feature, p=args.p_ward,
                                 n_clusters=len(unique_labels(y)))
-
-    if args.dont_use_ga:
+    elif args.strategy == 'none':
         meta_clustering = clustering_algorithm
 
     start_time = datetime.datetime.now()
@@ -158,7 +152,7 @@ def run(args=None):
 
     best_features = []
     best_prediction = []
-    if args.dont_use_ga:
+    if args.strategy == 'none':
         best_features = dataset.columns.values
         best_prediction = meta_clustering.labels_
         meta_clustering.metrics_ = ''
