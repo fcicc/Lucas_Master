@@ -285,7 +285,7 @@ def show_result(args):
     session.close()
 
 
-def filter_dataset(input_file, db_file, output_file, result_id):
+def filter_dataset(db_file):
 
     session = local_create_session(db_file)
 
@@ -298,22 +298,6 @@ def filter_dataset(input_file, db_file, output_file, result_id):
         # score = n_final/n_init
         print(f'[{result.id}]{result.name} {scenario} - {acc} {n_final}')
     session.close()
-    # level = result.args_to_dict()['scenario']
-    # columns = [selected_feature.column for selected_feature in result.selected_features]
-    # labels = [int(result_label.label) for result_label in result.result_labels]
-    #
-    # session.close()
-    #
-    # df = pd.read_excel(input_file, index_col=0, header=[0, 1, 2])
-    #
-    # # df = df.filter(items=columns + ['petrofacie'])
-    # others = df.xs('others', axis=1, level=0, drop_level=False)
-    # df = pd.concat([df.xs(column, axis=1, level=1, drop_level=False) for column in columns] + [others], axis=1)
-    #
-    # if output_file:
-    #     df.to_excel(output_file)
-    # else:
-    #     return df
 
 
 def select_best(args):
@@ -352,16 +336,13 @@ def export_results(args):
         data = [[float(val) for val in scores_dict.values()]]
         df_rows += [pd.DataFrame(data=data, columns=scores_dict.keys())]
 
-    df = pd.concat(df_rows)
+    df: pd.DataFrame = pd.concat(df_rows)
     df.index = index
     df.sort_index(axis=0, level=0, inplace=True)
     df = df.groupby(level=[0, 1]).mean()
 
     writer = pd.ExcelWriter(args.output_file)
-    for scenario, group in df.groupby(level=[1], ):
-        group.index = group.index.droplevel(level=-1)
-        sheet_name = re.sub('[^a-zA-Z,]', '', scenario)
-        group.to_excel(excel_writer=writer, sheet_name=sheet_name[:30])
+    df.to_excel(writer)
     writer.close()
 
     session.close()
@@ -412,7 +393,7 @@ def main(args=None):
     elif args.confusion_matrix:
         result = confusion_matrix(args)
     elif args.filter:
-        filter_dataset(args.input_file, args.db_file, args.output_file, args.id)
+        filter_dataset(args.db_file)
     elif args.select_best:
         select_best(args)
     elif args.plot_logs:
