@@ -2,7 +2,7 @@ import numpy as np
 import rpy2.robjects.numpy2ri
 from rpy2.robjects import r
 from scipy.spatial import distance
-from sklearn.metrics import silhouette_samples, silhouette_score, accuracy_score, adjusted_rand_score
+from sklearn.metrics import silhouette_samples, silhouette_score, accuracy_score, adjusted_rand_score, f1_score
 
 from package.DBCV import DBCV
 
@@ -26,7 +26,7 @@ CLUSTER_CRIT_ALLOWED_FITNESSES = [('C_index', -1), ('Calinski_Harabasz', 1), ('D
                                   ('Wemmert_Gancarski', 1)]
 ALLOWED_FITNESSES = CLUSTER_CRIT_ALLOWED_FITNESSES + \
                     [('silhouette_sklearn', 1), ('min_silhouette_sklearn', 1), ('accuracy', 1),
-                     ('adjusted_rand_score', 1)]
+                     ('adjusted_rand_score', 1), ('f1_micro', 1), ('f1_macro', 1)]
 DICT_ALLOWED_FITNESSES = dict(ALLOWED_FITNESSES)
 
 
@@ -63,6 +63,16 @@ def eval_features(X, ac, metric, samples_dist_matrix, y, individual):
         if y is None:
             raise ValueError('The correct values are obligatory to calculate ARI')
         index1 = adjusted_rand_score(y, prediction)
+    elif metric == 'f1_micro':
+        if y is None:
+            raise ValueError('The correct values are obligatory to calculate f1_measure')
+        y_prediction = class_cluster_match(y, prediction)
+        index1 = f1_score(y, y_prediction, average='micro')
+    elif metric == 'f1_macro':
+        if y is None:
+            raise ValueError('The correct values are obligatory to calculate f1_measure')
+        y_prediction = class_cluster_match(y, prediction)
+        index1 = f1_score(y, y_prediction, average='macro')
     else:
         index1 = r['unique_criteria'](x_individual, prediction, metric)
         index1 = np.asarray(index1)[0][0]

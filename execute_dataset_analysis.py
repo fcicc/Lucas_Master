@@ -5,16 +5,22 @@ from package.main import run
 
 
 def main():
-    run_multiple = 1
-    db_file = 'tmp.db'
+    run_multiple = 200
+    db_file = 'kmeans.db'
+    # args = {
+    #     '-e': '0.1',
+    #     '--num-gen': '2',
+    #     '--pop-size': '256',
+    #     '--min-features': '2',
+    #     '--strategy': 'none',
+    #     '--db-file': db_file,
+    #     '--cluster-algorithm': 'agglomerative'
+    # }
+
     args = {
-        '-e': '0.1',
-        '--num-gen': '2',
-        '--pop-size': '256',
-        '--min-features': '2',
         '--strategy': 'none',
         '--db-file': db_file,
-        '--cluster-algorithm': 'agglomerative'
+        '--cluster-algorithm': 'kmeans'
     }
 
     datasets_folder = './datasets/'
