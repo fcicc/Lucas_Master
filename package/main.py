@@ -134,6 +134,17 @@ def save_output_to_db(args, clustering_algorithm, dataset, end_time, meta_cluste
             best_phenotype += [1]
         else:
             best_phenotype += [0]
+    scores = calculate_all_scores(best_phenotype, clustering_algorithm, dataset, y)
+    result_id = store_results(scores, initial_n_features, final_n_features,
+                              start_time, end_time, cm, args, best_features, args.experiment_name,
+                              meta_clustering.metrics_, args.db_file, best_prediction)
+    return result_id, scores
+
+
+def calculate_all_scores(best_phenotype, clustering_algorithm, dataset, y):
+    """Calculates every possible metric.
+    :rtype: dict
+    """
     samples_dist_matrix = distance.squareform(distance.pdist(dataset.values))
     allowed_fitness = list(DICT_ALLOWED_FITNESSES.keys())
     scores = [(fitness_name, fitness_value) for fitness_name, fitness_value in
@@ -141,10 +152,7 @@ def save_output_to_db(args, clustering_algorithm, dataset, end_time, meta_cluste
                   eval_multiple(dataset.values, clustering_algorithm, allowed_fitness, samples_dist_matrix, y,
                                 best_phenotype))]
     scores = dict(scores)
-    result_id = store_results(scores, initial_n_features, final_n_features,
-                              start_time, end_time, cm, args, best_features, args.experiment_name,
-                              meta_clustering.metrics_, args.db_file, best_prediction)
-    return result_id, scores
+    return scores
 
 
 def select_meta_clustering_algorithm(args, clustering_algorithm, dataset, y):
