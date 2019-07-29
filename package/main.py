@@ -106,7 +106,7 @@ def save_output_to_db(args, clustering_algorithm, dataset, end_time, meta_cluste
     if args.strategy == 'none':
         best_features = dataset.columns.values
         best_prediction = meta_clustering.labels_
-        meta_clustering.metrics_ = ''
+        meta_clustering.metrics_ = pd.DataFrame()
     elif args.strategy == 'pso':
         best_weights = meta_clustering.global_best_
         best_prediction = clustering_algorithm.fit(dataset.values * best_weights).labels_
@@ -118,11 +118,11 @@ def save_output_to_db(args, clustering_algorithm, dataset, end_time, meta_cluste
     elif args.strategy == 'ward_p':
         best_features = dataset.columns.values
         best_prediction = meta_clustering.labels_
-        meta_clustering.metrics_ = ''
+        meta_clustering.metrics_ = pd.DataFrame()
     elif args.strategy == 'random_ga':
         best_features = dataset.columns.values
         best_prediction = meta_clustering.global_best_
-        meta_clustering.metrics_ = ''
+        meta_clustering.metrics_ = pd.DataFrame()
     initial_n_features = dataset.values.shape[1]
     final_n_features = len(best_features)
     y_prediction = class_cluster_match(y, best_prediction)
@@ -136,8 +136,8 @@ def save_output_to_db(args, clustering_algorithm, dataset, end_time, meta_cluste
             best_phenotype += [0]
     scores = calculate_all_scores(best_phenotype, clustering_algorithm, dataset, y)
     result_id = store_results(scores, initial_n_features, final_n_features,
-                              start_time, end_time, cm, args, best_features, args.experiment_name,
-                              meta_clustering.metrics_, args.db_file, best_prediction)
+                              start_time, end_time, cm, args, best_features,
+                              meta_clustering.metrics_, best_prediction)
     return result_id, scores
 
 

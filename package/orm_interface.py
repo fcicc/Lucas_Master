@@ -4,20 +4,22 @@ from package.orm_models import Result, ConfusionMatrix, ConfusionMatrixNumber, C
 
 
 def store_results(scores, initial_n_features, final_n_features, start_time,
-                  end_time, confusion_matrix, args, selected_columns, result_name, ga_metrics, db_file, cluster_labels):
+                  end_time, confusion_matrix, args, selected_columns, ga_metrics, cluster_labels):
     """
 
-    :type db_file: str
+    :type scores: dict
     :type ga_metrics: pandas.DataFrame
     :type args: argparse.Namespace
     :type final_n_features: int
     :type initial_n_features: int
-    :type result_name: str
     :type selected_columns: list
     :type end_time: datetime.datetime
     :type start_time: datetime.datetime
     :type confusion_matrix: pandas.DataFrame
     """
+
+    result_name = args.experiment_name
+    db_file = args.db_file
 
     session = local_create_session(db_file)
 
