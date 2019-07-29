@@ -9,11 +9,10 @@ def main():
     db_file = 'tmp.db'
     args = {
         '-e': '0.1',
-        '--num-gen': '1000',
+        '--num-gen': '2',
         '--pop-size': '256',
         '--min-features': '2',
-        '--max-features': '10000',
-        '--strategy': 'ga',
+        '--strategy': 'none',
         '--db-file': db_file,
         '--cluster-algorithm': 'agglomerative'
     }
@@ -45,7 +44,7 @@ def main():
                 print(f'{i+1}/{run_multiple}')
 
                 list_local_args = list(chain.from_iterable(local_args.items()))
-                run(args=list_local_args + [dataset_file, experiment_name, '--multi-level'])
+                run(args=list_local_args + [dataset_file, experiment_name])
 
 
 if __name__ == '__main__':
