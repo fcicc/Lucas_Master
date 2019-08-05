@@ -5,8 +5,28 @@ from package.main import run
 
 
 def main():
-    run_multiple = 3
+    run_multiple = 1
     db_file = 'affinityProp.db'
+
+    affinity_preferences = {
+        "('raw',)": {
+            'campus_basin': -650,
+            'equatorial_margin': -400,
+            'talara_basin': -400,
+            'carmopolisGrouped': -540,
+            'jequitinhonha': -470,
+            'mucuri': -5300
+        },
+        "('compositional_groups', 'localizational_groups')": {
+            'campus_basin': -800,
+            'equatorial_margin': -400,
+            'talara_basin': -400,
+            'carmopolisGrouped': -540,
+            'jequitinhonha': -470,
+            'mucuri': -5300
+        }
+    }
+
     # args = {
     #     '-e': '0.1',
     #     '--num-gen': '2',
@@ -20,7 +40,7 @@ def main():
     args = {
         '--strategy': 'none',
         '--db-file': db_file,
-        '--cluster-algorithm': 'affinity-propagation'
+        '--cluster-algorithm': 'affinity-propagation',
     }
 
     # args = {
@@ -31,6 +51,7 @@ def main():
 
     datasets_folder = './datasets/'
     dataset_locations = {
+
         'campus_basin': datasets_folder + '/CampusBasin/subtotals_dataset.xlsx',
         'equatorial_margin': datasets_folder + '/MargemEquatorial/subtotals_dataset.xlsx',
         'talara_basin': datasets_folder + '/TalaraBasin/subtotals_dataset.xlsx',
@@ -45,12 +66,17 @@ def main():
             raise FileNotFoundError(f'{dataset_file} not found for {name}')
 
     for scenario in [('raw',), ('compositional_groups', 'localizational_groups')]:
+        print(scenario)
         local_args = args
         local_args['--scenario'] = list(scenario)
         fitness_metric = 'silhouette_sklearn'
         local_args['--fitness-metric'] = fitness_metric
         for experiment_name, dataset_file in dataset_locations.items():
             print(f'RUNNING {experiment_name} in scenario {str(scenario)}')
+
+            if local_args['--cluster-algorithm'] == 'affinity-propagation':
+                print(affinity_preferences[str(scenario)][experiment_name])
+                local_args['--preference'] = str(affinity_preferences[str(scenario)][experiment_name])
 
             for i in range(run_multiple):
                 print(f'{i+1}/{run_multiple}')

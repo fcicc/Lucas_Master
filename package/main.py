@@ -62,6 +62,8 @@ def argument_parser(args) -> argparse.Namespace:
                                                                                                     'none'])
     parser.add_argument('--p_ward', type=float, default=2,
                         help='Ward P exponential value')
+    parser.add_argument('--preference', type=float, default=0,
+                        help='Preference for Affinity Propagation')
     parser.add_argument('--scenario', nargs='+', help='List of scenarios of features to be used', required=True)
 
     args = parser.parse_args(args=args)
@@ -196,7 +198,7 @@ def select_clustering_algorithm(args, y):
     elif args.cluster_algorithm == 'kmeans':
         clustering_algorithm = cluster.KMeans(n_clusters=len(unique_labels(y)), n_init=10)
     elif args.cluster_algorithm == 'affinity-propagation':
-        clustering_algorithm = cluster.AffinityPropagation(preference=-250)
+        clustering_algorithm = cluster.AffinityPropagation(preference=float(args.preference))
     elif args.cluster_algorithm == 'perfect-classifier':
         clustering_algorithm = CheatingClustering(y=y)
     assert clustering_algorithm is not None
