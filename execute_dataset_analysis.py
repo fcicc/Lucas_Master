@@ -5,7 +5,7 @@ from package.main import run
 
 
 def main():
-    run_multiple = 1
+    run_multiple = 3
     db_file = 'affinityProp.db'
 
     affinity_preferences = {
@@ -18,12 +18,12 @@ def main():
             'mucuri': -5300
         },
         "('compositional_groups', 'localizational_groups')": {
-            'campus_basin': -800,
-            'equatorial_margin': -400,
-            'talara_basin': -400,
-            'carmopolisGrouped': -540,
-            'jequitinhonha': -470,
-            'mucuri': -5300
+            'campus_basin': -1550,
+            'equatorial_margin': -900,
+            'talara_basin': -750,
+            'carmopolisGrouped': -1590,
+            'jequitinhonha': -900,
+            'mucuri': -7700
         }
     }
 
