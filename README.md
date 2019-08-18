@@ -10,7 +10,7 @@ Open a terminal and run the following commands:
 ```console
 git clone https://github.com/BDI-UFRGS/Lucas_Master
 cd Lucas_Master
-conda create --file environment.yml
+conda env create --file environment.yml
 conda activate pugens_master
 R
 ```
