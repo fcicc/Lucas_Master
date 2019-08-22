@@ -1,10 +1,10 @@
 import math
+import random
 import warnings
 from copy import deepcopy
 from functools import partial
 from multiprocessing import cpu_count
 from multiprocessing.pool import Pool
-import random
 
 import numpy as np
 import pandas as pd
@@ -14,7 +14,7 @@ from scipy.spatial import distance
 from tqdm import tqdm
 
 from package.evaluation_functions import ALLOWED_FITNESSES, eval_features, evaluate, \
-    DICT_ALLOWED_FITNESSES, eval_multiple
+    eval_multiple
 
 
 def force_bounds(minimum, maximum, individual):
@@ -123,7 +123,7 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
             population[ind][:] = [0]*X.shape[1]
             population = list(map(partial(force_bounds, self.min_features, self.max_features), population))
 
-        evaluate_rate_methods = ['accuracy']
+        evaluate_rate_methods = ['accuracy', 'adjusted_rand_score']
         evaluate_rate_function = partial(eval_multiple, X, self.algorithm, evaluate_rate_methods, samples_dist_matrix, y)
 
         global_best = None
