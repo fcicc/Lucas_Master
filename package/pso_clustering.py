@@ -1,10 +1,10 @@
 import math
-import numpy as np
 import random
 import warnings
 from functools import partial
 from multiprocessing.pool import Pool
 
+import numpy as np
 import pandas as pd
 import sklearn
 from deap import base
@@ -27,17 +27,17 @@ def generate(size, creator, position_minimum, position_maximum, speed_minimum, s
 def update_particle(part, global_best, phi1, phi2):
     distance_to_global_best = np.sum(global_best - part)
 
-    # u1 = (random.uniform(0, phi1) for _ in range(len(part)))
-    # u2 = (random.uniform(0, phi2) for _ in range(len(part)))
-    # v_u1 = map(operator.mul, u1, map(operator.sub, part.local_best, part))
-    # v_u2 = map(operator.mul, u2, map(operator.sub, global_best, part))
-    # part.speed = list(map(operator.add, part.speed, map(operator.add, v_u1, v_u2)))
-    # for i, speed in enumerate(part.speed):
-    #     if speed < part.speed_minimum:
-    #         part.speed[i] = part.speed_minimum
-    #     elif speed > part.speed_maximum:
-    #         part.speed[i] = part.speed_maximum
-    # part[:] = list(map(operator.add, part, part.speed))
+    u1 = (random.uniform(0, phi1) for _ in range(len(part)))
+    u2 = (random.uniform(0, phi2) for _ in range(len(part)))
+    v_u1 = map(operator.mul, u1, map(operator.sub, part.local_best, part))
+    v_u2 = map(operator.mul, u2, map(operator.sub, global_best, part))
+    part.speed = list(map(operator.add, part.speed, map(operator.add, v_u1, v_u2)))
+    for i, speed in enumerate(part.speed):
+        if speed < part.speed_minimum:
+            part.speed[i] = part.speed_minimum
+        elif speed > part.speed_maximum:
+            part.speed[i] = part.speed_maximum
+    part[:] = list(map(operator.add, part, part.speed))
 
 
 def setup_creator(fitness_metric):
