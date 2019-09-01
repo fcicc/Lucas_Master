@@ -216,7 +216,7 @@ def select_clustering_algorithm(args, y):
 def parse_excel_dataset_to_df(args):
     df = pd.read_excel(args.input_file, index_col=0, header=[0, 1, 2])
     scenario = e_scenarios[args.scenario].value
-    scenario = [subset for subset in scenario[0] if subset in df.columns.get_level_values('top_level')]
+    scenario = [subset for subset in scenario if subset in df.columns.get_level_values('top_level')]
     df = df[scenario + ['others']]
     df = df.groupby(level=[args.level], axis=1).sum()
 
