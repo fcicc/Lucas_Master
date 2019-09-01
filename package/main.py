@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import warnings
+from enum import Enum
 
 import numpy as np
 import pandas as pd
@@ -26,6 +27,11 @@ warnings.filterwarnings("ignore", category=RRuntimeWarning)
 rpy2.robjects.r['options'](warn=-1)
 
 
+class e_scenarios(Enum):
+    RAW = ('raw',)
+    COMPOSITIONAL_LOCALIZATIONAL = ('compositional_groups', 'localizational_groups')
+
+
 def argument_parser(args) -> argparse.Namespace:
     """Parse input arguments."""
     parser = argparse.ArgumentParser(
@@ -36,7 +42,8 @@ def argument_parser(args) -> argparse.Namespace:
                         help='input CSV file')
     parser.add_argument('experiment_name', type=str, default='experiment',
                         help='name to be used in output files')
-    parser.add_argument('--level', type=str, default='features_groups', choices=['features_group', 'features'],
+    parser.add_argument('--level', type=str, default='features_groups',
+                        choices=['features_groups', 'features'],
                         help='input CSV file')
     parser.add_argument('--num-gen', type=int, default=500,
                         help='number of generations')
@@ -64,7 +71,8 @@ def argument_parser(args) -> argparse.Namespace:
                         help='Ward P exponential value')
     parser.add_argument('--preference', type=float, default=0,
                         help='Preference for Affinity Propagation')
-    parser.add_argument('--scenario', nargs='+', help='List of scenarios of features to be used', required=True)
+    parser.add_argument('--scenario', type=str, help='List of scenarios of features to be used', required=True,
+                        choices=[scenario.name for scenario in e_scenarios])
 
     args = parser.parse_args(args=args)
 
@@ -207,7 +215,8 @@ def select_clustering_algorithm(args, y):
 
 def parse_excel_dataset_to_df(args):
     df = pd.read_excel(args.input_file, index_col=0, header=[0, 1, 2])
-    scenario = [subset for subset in args.scenario[0] if subset in df.columns.get_level_values('top_level')]
+    scenario = e_scenarios[args.scenario].value
+    scenario = [subset for subset in scenario[0] if subset in df.columns.get_level_values('top_level')]
     df = df[scenario + ['others']]
     df = df.groupby(level=[args.level], axis=1).sum()
 

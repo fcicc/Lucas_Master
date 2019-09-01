@@ -1,11 +1,6 @@
 from enum import Enum
 
-from package.main import run
-
-
-class e_scenarios(Enum):
-    RAW = ('raw',)
-    COMPOSITIONAL_LOCALIZATIONAL = ('compositional_groups', 'localizational_groups')
+from package.main import run, e_scenarios
 
 
 class e_datasets(Enum):
@@ -18,6 +13,7 @@ class e_datasets(Enum):
     # 'carmopolis': DATASETS_FOLDER + '/Carmopolis/subtotals_dataset.xlsx'
 
 
+META_CLUSTERING_ALGORITHMS = ['ga', 'pso', 'ward_p', 'random_ga', 'none']
 CLUSTERING_ALGORITHMS = ['agglomerative', 'kmeans', 'affinity-propagation']
 
 PREFERENCES = {
@@ -39,24 +35,80 @@ PREFERENCES = {
     }
 }
 
-
 def run_experiment(args):
     run(args=args)
 
 
 if __name__ == '__main__':
     # 1 - Experimentos avaliando os algoritmos de clustering
+    database = 'results_1.db'
     for algorithm in CLUSTERING_ALGORITHMS:
         for dataset in e_datasets:
-            input_args = [
-                dataset.value,
-                '1',
-
-            ]
-            print(f'Algorithm: {algorithm}')
-            print(f'Dataset: {dataset.value}')
+            for scenario in e_scenarios:
+                input_args = [
+                    dataset.value,
+                    '1',
+                    '--level', 'features_groups',
+                    # '--num-gen', '0',
+                    # '--pop-size', '0',
+                    # '--perfect',
+                    '--eval-rate', '1',
+                    '--min-features', '2',
+                    '--fitness-metric', 'silhouette_sklearn',
+                    '--cluster-algorithm', f'{algorithm}',
+                    '--db-file', f'{database}',
+                    '--strategy', 'none',
+                    # '--p_ward', '0',
+                    # '--preference', '0',
+                    f'--scenario', scenario.name
+                ]
+                run_experiment(input_args)
     # 2 Experimentos avaliando as métricas internas de qualidade dos clusters
-    # 3 Experimentos avaliando com outras abordagens de seleção de features (PCA,...)
+    # database = 'results_2.db'
+    # for metric in ALLOWED_METRICS:
+    #     for dataset in e_datasets:
+    #         for scenario in e_scenarios:
+    #             input_args = [
+    #                 dataset.value,
+    #                 '2',
+    #                 '--level features_group',
+    #                 '--num-gen 200',
+    #                 '--pop-size 128',
+    #                 # '--perfect',
+    #                 '--eval-rate 0.2',
+    #                 '--min-features 2',
+    #                 f'--fitness-metric {metric}',
+    #                 f'--cluster_algorithm {algorithm}',
+    #                 f'--db-file {database}',
+    #                 '--strategy ga',
+    #                 # '--p_ward 0',
+    #                 # '--preference 0',
+    #                 f'--scenario {scenario.value}',
+    #             ]
+    #             run_experiment(input_args)
+    # # 3 Experimentos avaliando com outras abordagens de seleção de features (PCA,...)
+    # database = 'results_3.db'
+    # for metric in ALLOWED_METRICS:
+    #     for dataset in e_datasets:
+    #         for scenario in e_scenarios:
+    #             input_args = [
+    #                 dataset.value,
+    #                 '3',
+    #                 '--level features_group',
+    #                 '--num-gen 200',
+    #                 '--pop-size 128',
+    #                 # '--perfect',
+    #                 '--eval-rate 0.2',
+    #                 '--min-features 2',
+    #                 '--fitness-metric silhouette_sklearn',
+    #                 f'--cluster_algorithm {algorithm}',
+    #                 f'--db-file {database}',
+    #                 '--strategy none',
+    #                 # '--p_ward 0',
+    #                 # '--preference 0',
+    #                 f'--scenario {scenario.value}',
+    #             ]
+    #             run_experiment(input_args)
     # 4 Experimento mostrando o limite teórico do coeficiente de silhuete para os datasets selecionados
     # 5 Experimento rodando a abordagem e comparando o coeficiente de silhueta com os limite teórico e as métricas externas
     # 6 Experimentos mostrando que com reengenharia baseada em ontologia os resultados se aproximam da abordagem sem reengeharia
