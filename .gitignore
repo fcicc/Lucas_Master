@@ -113,7 +113,7 @@ ENV/
 
 test_scenario
 petrel
-*.db
+# *.db
 execute_dataset_analysis.py
 datasets*
 petroledge_model.owl
