@@ -27,6 +27,7 @@ class e_clustering_algorithms(Enum):
     KMEANS = 'kmeans'
     AFFINITY_PROPAGATION = 'affinity-propagation'
 
+
 PREFERENCES = {
     e_scenarios.RAW: {
         e_datasets.CAMPUS_BASIN: -650,
@@ -53,28 +54,28 @@ def run_experiment(args):
 
 if __name__ == '__main__':
     # 1 - Experimentos avaliando os algoritmos de clustering
-    # database = 'results_1.db'
-    # for algorithm in e_clustering_algorithms:
-    #     for dataset in e_datasets:
-    #         for scenario in e_scenarios:
-    #             input_args = [
-    #                 dataset.value,
-    #                 '1',
-    #                 '--level', 'features_groups',
-    #                 # '--num-gen', '0',
-    #                 # '--pop-size', '0',
-    #                 # '--perfect',
-    #                 '--eval-rate', '1',
-    #                 '--min-features', '50',
-    #                 '--fitness-metric', 'silhouette_sklearn',
-    #                 '--cluster-algorithm', f'{algorithm.value}',
-    #                 '--db-file', f'{database}',
-    #                 '--strategy', 'none',
-    #                 # '--p_ward', '0',
-    #                 '--preference', str(PREFERENCES[scenario][dataset]),
-    #                 f'--scenario', scenario.name
-    #             ]
-    #             run_experiment(input_args)
+    database = 'results_1.db'
+    for algorithm in e_clustering_algorithms:
+        for dataset in e_datasets:
+            for scenario in e_scenarios:
+                input_args = [
+                    dataset.value,
+                    '1',
+                    '--level', 'features_groups',
+                    # '--num-gen', '0',
+                    # '--pop-size', '0',
+                    # '--perfect',
+                    '--eval-rate', '1',
+                    '--min-features', '50',
+                    '--fitness-metric', 'silhouette_sklearn',
+                    '--cluster-algorithm', f'{algorithm.value}',
+                    '--db-file', f'{database}',
+                    '--strategy', 'none',
+                    # '--p_ward', '0',
+                    '--preference', str(PREFERENCES[scenario][dataset]),
+                    f'--scenario', scenario.name
+                ]
+                run_experiment(input_args)
     # 2 Experimentos avaliando as métricas internas de qualidade dos clusters
     database = 'results_2.db'
     for metric, _ in CLUSTER_CRIT_ALLOWED_FITNESSES:
@@ -95,37 +96,37 @@ if __name__ == '__main__':
                     '--strategy', 'ga',
                     # '--p_ward', '0',
                     # '--preference', '0',
-                    f'--scenario', f'{scenario.value}',
+                    f'--scenario', f'{scenario.name}',
                 ]
                 run_experiment(input_args)
     # # 3 Experimentos avaliando com outras abordagens de seleção de features (PCA,...)
     # database = 'results_3.db'
-    # for metric in ALLOWED_METRICS:
-    #     for dataset in e_datasets:
-    #         for scenario in e_scenarios:
-    #             input_args = [
-    #                 dataset.value,
-    #                 '3',
-    #                 '--level features_group',
-    #                 '--num-gen 200',
-    #                 '--pop-size 128',
-    #                 # '--perfect',
-    #                 '--eval-rate 0.2',
-    #                 '--min-features 2',
-    #                 '--fitness-metric silhouette_sklearn',
-    #                 f'--cluster_algorithm {algorithm}',
-    #                 f'--db-file {database}',
-    #                 '--strategy none',
-    #                 # '--p_ward 0',
-    #                 # '--preference 0',
-    #                 f'--scenario {scenario.value}',
-    #             ]
-    #             run_experiment(input_args)
     # 4 Experimento mostrando o limite teórico do coeficiente de silhuete para os datasets selecionados
+    database = 'results_4.db'
+    for algorithm in e_clustering_algorithms:
+        for dataset in e_datasets:
+            for scenario in e_scenarios:
+                input_args = [
+                    dataset.value,
+                    '1',
+                    '--level', 'features_groups',
+                    # '--num-gen', '0',
+                    # '--pop-size', '0',
+                    '--perfect',
+                    '--eval-rate', '.2',
+                    '--min-features', '50',
+                    '--fitness-metric', 'silhouette_sklearn',
+                    '--cluster-algorithm', e_clustering_algorithms.AGGLOMERATIVE.value,
+                    '--db-file', f'{database}',
+                    '--strategy', 'none',
+                    # '--p_ward', '0',
+                    # '--preference', str(PREFERENCES[scenario][dataset]),
+                    f'--scenario', scenario.name
+                ]
+                run_experiment(input_args)
     # 5 Experimento rodando a abordagem e comparando o coeficiente de silhueta com os limite teórico e as métricas externas
     # 6 Experimentos mostrando que com reengenharia baseada em ontologia os resultados se aproximam da abordagem sem reengeharia
     # 7 Experimento mostrando o percentual de features desejáveis (de acordo com o expert) mantidas na seleção (talvez ao longo das gerações)
     # 8 Experimentos mostrando que com reengenharia de features a abordagem roda mais rápido
     # 9 Experimentos mostrando que com reengenharia de features a abordagem roda mais rápido
     # 10 Qualitative Analysis
-    pass
