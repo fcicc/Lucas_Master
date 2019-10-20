@@ -99,10 +99,10 @@ if __name__ == '__main__':
                     f'--scenario', f'{scenario.name}',
                 ]
                 run_experiment(input_args)
-    # # 3 Experimentos avaliando com outras abordagens de seleção de features (PCA,...)
+    # 3 Experimentos avaliando com outras abordagens de seleção de features (PCA,...)
     # database = 'results_3.db'
     # 4 Experimento mostrando o limite teórico do coeficiente de silhuete para os datasets selecionados
-    database = 'results_4.db'
+    database = 'results_4_1.db'
     for algorithm in e_clustering_algorithms:
         for dataset in e_datasets:
             for scenario in e_scenarios:
@@ -114,11 +114,11 @@ if __name__ == '__main__':
                     # '--pop-size', '0',
                     '--perfect',
                     '--eval-rate', '.2',
-                    '--min-features', '50',
-                    '--fitness-metric', 'silhouette_sklearn',
-                    '--cluster-algorithm', e_clustering_algorithms.AGGLOMERATIVE.value,
+                    '--min-features', '2',
+                    '--fitness-metric', 'accuracy',
+                    '--cluster-algorithm', 'agglomerative',
                     '--db-file', f'{database}',
-                    '--strategy', 'none',
+                    '--strategy', 'ga',
                     # '--p_ward', '0',
                     # '--preference', str(PREFERENCES[scenario][dataset]),
                     f'--scenario', scenario.name
