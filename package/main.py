@@ -2,6 +2,7 @@ import argparse
 import datetime
 import warnings
 from enum import Enum
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -213,7 +214,12 @@ def select_clustering_algorithm(args, y):
     return clustering_algorithm
 
 
-def parse_excel_dataset_to_df(args):
+def parse_excel_dataset_to_df(args) -> Tuple[pd.DataFrame, list]:
+    """
+
+    :type args: object
+    :return:
+    """
     df = pd.read_excel(args.input_file, index_col=0, header=[0, 1, 2])
     scenario = e_scenarios[args.scenario].value
     scenario = [subset for subset in scenario if subset in df.columns.get_level_values('top_level')]
