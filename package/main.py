@@ -13,6 +13,7 @@ from sklearn.utils.multiclass import unique_labels
 
 from package.CheatingClustering import CheatingClustering
 from package.coclustering import CoClustering
+from package.copac import COPAC
 from package.evaluation_functions import DICT_ALLOWED_FITNESSES, eval_multiple
 from package.ga_clustering import ALLOWED_FITNESSES, GAClustering
 from package.orm_interface import store_results
@@ -52,7 +53,7 @@ def argument_parser(args) -> argparse.Namespace:
                         help='fitness function to be used', choices=[fitnes_str for fitnes_str, _ in ALLOWED_FITNESSES])
     parser.add_argument('--cluster-algorithm', type=str, default='agglomerative',
                         help='cluster algorithm to be used', choices=['agglomerative', 'kmeans',
-                                                                      'affinity-propagation', 'perfect-classifier'])
+                                                                      'affinity-propagation', 'perfect-classifier', 'copac'])
     parser.add_argument('-o', '--db-file', type=str, default='./local.db',
                         help='sqlite file to store results')
     parser.add_argument('-s', '--strategy', type=str, default='none',
@@ -65,6 +66,13 @@ def argument_parser(args) -> argparse.Namespace:
     parser.add_argument('--preference', type=float, default=0,
                         help='Preference for Affinity Propagation')
     parser.add_argument('--scenario', nargs='+', help='List of scenarios of features to be used', required=True)
+
+    parser.add_argument('--k_neighbors', type=int, default=20,
+                        help='Size of local neighborhood for local correlation dimensionality')
+    parser.add_argument('--eps', type=float, default=25.0,
+                        help='Neighborhood predicate, so that neighbors are closer than `eps`')
+    parser.add_argument('--min_samples', type=int, default=1,
+                        help='Minimum number of points in a copac with min_samples <= k_neighbors')
 
     args = parser.parse_args(args=args)
 
@@ -201,6 +209,8 @@ def select_clustering_algorithm(args, y):
         clustering_algorithm = cluster.AffinityPropagation(preference=float(args.preference))
     elif args.cluster_algorithm == 'perfect-classifier':
         clustering_algorithm = CheatingClustering(y=y)
+    elif args.cluster_algorithm == 'copac':
+        clustering_algorithm = COPAC(k=args.k_neighbors, eps=args.eps, mu=args.min_samples)
     assert clustering_algorithm is not None
     return clustering_algorithm
 
