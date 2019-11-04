@@ -71,16 +71,16 @@ def setup_toolbox(data_shape, min_features, max_features, algorithm, n_clusters)
         toolbox.register("attr_bool", random.randint, 0, n_clusters-1)
         toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, n=data_shape[0])
         toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-        toolbox.register("mate", tools.cxUniform, indpb=0.1)
-        toolbox.register("mutate", tools.mutUniformInt, low=0, up=n_clusters-1, indpb=0.05)
+        toolbox.register("mate", tools.cxUniform, indpb=0.5)
+        toolbox.register("mutate", tools.mutUniformInt, low=0, up=n_clusters-1, indpb=0.5)
         toolbox.register("select", tools.selTournament, tournsize=3)
 
     else:
         toolbox.register("attr_bool", random.randint, 0, 1)
         toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, n=data_shape[1])
         toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-        toolbox.register("mate", tools.cxUniform, indpb=0.1)
-        toolbox.register("mutate", tools.mutFlipBit, indpb=0.05)
+        toolbox.register("mate", tools.cxUniform, indpb=0.5)
+        toolbox.register("mutate", tools.mutFlipBit, indpb=0.5)
         toolbox.register("select", tools.selTournament, tournsize=3)
 
         toolbox.decorate("mate", check_bounds(min_features, max_features))
@@ -141,7 +141,7 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
                     sample_fits = [metric + [gen] for metric in sample_fits]
                     metrics += sample_fits
 
-                offspring = algorithms.varOr(population, toolbox, self.pop_size, cxpb=0.2, mutpb=0.8)
+                offspring = algorithms.varOr(population, toolbox, self.pop_size, cxpb=0.5, mutpb=0.5)
                 offspring = evaluate(toolbox, offspring)
 
                 if global_best is None:

@@ -60,29 +60,29 @@ def store_results(scores, initial_n_features, final_n_features, start_time,
     session.add(cm_entry)
     session.flush()
 
-    cm_matrix = confusion_matrix.values
+    # cm_matrix = confusion_matrix.values
 
-    labels = confusion_matrix.index.values
-    cm_numbers_entries = []
-    cm_labels_entries = []
+    # labels = confusion_matrix.index.values
+    # cm_numbers_entries = []
+    # cm_labels_entries = []
 
-    for i, row in enumerate(cm_matrix):
-        cm_label_entry = ConfusionMatrixLabel(
-            confusion_matrix_id=cm_entry.id,
-            row_column=int(i),
-            label=labels[i]
-        )
-        cm_labels_entries.append(cm_label_entry)
-        for j, val in enumerate(row):
-            cm_number_entry = ConfusionMatrixNumber(
-                confusion_matrix_id=cm_entry.id,
-                value=float(val),
-                row=int(i),
-                column=int(j)
-            )
-            cm_numbers_entries.append(cm_number_entry)
-    session.bulk_save_objects(cm_numbers_entries)
-    session.bulk_save_objects(cm_labels_entries)
+    # for i, row in enumerate(cm_matrix):
+    #     cm_label_entry = ConfusionMatrixLabel(
+    #         confusion_matrix_id=cm_entry.id,
+    #         row_column=int(i),
+    #         label=labels[i]
+    #     )
+    #     cm_labels_entries.append(cm_label_entry)
+    #     for j, val in enumerate(row):
+    #         cm_number_entry = ConfusionMatrixNumber(
+    #             confusion_matrix_id=cm_entry.id,
+    #             value=float(val),
+    #             row=int(i),
+    #             column=int(j)
+    #         )
+    #         cm_numbers_entries.append(cm_number_entry)
+    # session.bulk_save_objects(cm_numbers_entries)
+    # session.bulk_save_objects(cm_labels_entries)
 
     selected_features_entries = []
     for column in selected_columns:

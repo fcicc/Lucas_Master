@@ -10,25 +10,31 @@ rpy2.robjects.numpy2ri.activate()
 
 from package.utils import class_cluster_match
 
-CLUSTER_CRIT_ALLOWED_FITNESSES = [('C_index', -1), ('Calinski_Harabasz', 1), ('Davies_Bouldin', -1),
-                                  ('Dunn', 1), ('Gamma', 1), ('G_plus',
-                                                   1), ('GDI11', 1), ('GDI12', 1),
-                                  ('GDI13', 1), ('GDI21', 1), ('GDI22',
-                                                    1), ('GDI23', 1), ('GDI31', 1),
-                                  ('GDI32', 1), ('GDI33', 1), ('GDI41',
-                                                    1), ('GDI42', 1), ('GDI43', 1),
-                                  ('GDI51', 1), ('GDI52', 1), ('GDI53',
-                                                    1), ('McClain_Rao', -1), ('PBM', 1),
-                                  ('Point_Biserial', 1), ('Ray_Turi', -
-                                               1), ('Ratkowsky_Lance', 1),
-                                  ('SD_Scat', -1), ('SD_Dis', -
-                                         1), ('Silhouette', 1), ('Tau', 1),
-                                  ('Wemmert_Gancarski', 1)]
-ALLOWED_FITNESSES = CLUSTER_CRIT_ALLOWED_FITNESSES + \
-                    [('silhouette_sklearn', 1), ('min_silhouette_sklearn', 1), ('accuracy', 1),
-                     ('adjusted_rand_score', 1), ('f1_micro', 1), ('f1_macro', 1)]
-DICT_ALLOWED_FITNESSES = dict(ALLOWED_FITNESSES)
+# CLUSTER_CRIT_ALLOWED_FITNESSES = [('C_index', -1), ('Calinski_Harabasz', 1), ('Davies_Bouldin', -1),
+#                                   ('Dunn', 1), ('Gamma', 1), ('G_plus',
+#                                                    1), ('GDI11', 1), ('GDI12', 1),
+#                                   ('GDI13', 1), ('GDI21', 1), ('GDI22',
+#                                                     1), ('GDI23', 1), ('GDI31', 1),
+#                                   ('GDI32', 1), ('GDI33', 1), ('GDI41',
+#                                                     1), ('GDI42', 1), ('GDI43', 1),
+#                                   ('GDI51', 1), ('GDI52', 1), ('GDI53',
+#                                                     1), ('McClain_Rao', -1), ('PBM', 1),
+#                                   ('Point_Biserial', 1), ('Ray_Turi', -
+#                                                1), ('Ratkowsky_Lance', 1),
+#                                   ('SD_Scat', -1), ('SD_Dis', -
+#                                          1), ('Silhouette', 1), ('Tau', 1),
+#                                   ('Wemmert_Gancarski', 1)]
+# ALLOWED_FITNESSES = CLUSTER_CRIT_ALLOWED_FITNESSES + \
+#                     [('silhouette_sklearn', 1), ('min_silhouette_sklearn', 1), ('accuracy', 1),
+#                      ('adjusted_rand_score', 1), ('f1_micro', 1), ('f1_macro', 1)]
+# DICT_ALLOWED_FITNESSES = dict(ALLOWED_FITNESSES)
 
+ALLOWED_FITNESSES = [
+    ('silhouette_sklearn', 1),
+    ('adjusted_rand_score', 1),
+    ('accuracy', 1)
+]
+DICT_ALLOWED_FITNESSES = dict(ALLOWED_FITNESSES)
 
 r('''
     library('clusterCrit')

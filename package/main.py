@@ -65,7 +65,7 @@ def argument_parser(args) -> argparse.Namespace:
                         help='Ward P exponential value')
     parser.add_argument('--preference', type=float, default=0,
                         help='Preference for Affinity Propagation')
-    parser.add_argument('--scenario', nargs='+', help='List of scenarios of features to be used', required=True)
+    parser.add_argument('--scenario', nargs='+', help='List of scenarios of features to be used')
 
     parser.add_argument('--k_neighbors', type=int, default=20,
                         help='Size of local neighborhood for local correlation dimensionality')
@@ -86,7 +86,7 @@ def run(args=None):
 
     create_db_if_not_exists(args.db_file)
 
-    dataset, y = parse_excel_dataset_to_df(args)
+    dataset, y = parse_csv_dataset_to_df(args)
 
     clustering_algorithm = select_clustering_algorithm(args, y)
 
@@ -136,8 +136,8 @@ def save_output_to_db(args, clustering_algorithm, dataset, end_time, meta_cluste
     initial_n_features = dataset.values.shape[1]
     final_n_features = len(best_features)
     y_prediction = class_cluster_match(y, best_prediction)
-    cm = confusion_matrix(y, y_prediction)
-    cm = pd.DataFrame(data=cm, index=unique_labels(y), columns=unique_labels(y))
+    # cm = confusion_matrix(y, y_prediction)
+    # cm = pd.DataFrame(data=cm, index=unique_labels(y), columns=unique_labels(y))
     best_phenotype = []
     for feature in dataset.columns.values:
         if feature in best_features:
@@ -146,7 +146,7 @@ def save_output_to_db(args, clustering_algorithm, dataset, end_time, meta_cluste
             best_phenotype += [0]
     scores = calculate_all_scores(best_phenotype, clustering_algorithm, dataset, y)
     result_id = store_results(scores, initial_n_features, final_n_features,
-                              start_time, end_time, cm, args, best_features,
+                              start_time, end_time, None, args, best_features,
                               meta_clustering.metrics_, best_prediction)
     return result_id, scores
 
@@ -229,6 +229,17 @@ def parse_excel_dataset_to_df(args):
         del df['Cluster label']
     if 'phi stdev sorting' in df.columns:
         del df['phi stdev sorting']
+    y = df['petrofacie'].values
+    del df['petrofacie']
+    df = df.reset_index(drop=True)
+    return df, y
+
+def parse_csv_dataset_to_df(args):
+    df = pd.read_csv(args.input_file, sep=',')
+    if 'Unnamed: 0' in df.columns:
+        del df['Unnamed: 0']
+    if 'sorting' in df.columns:
+        del df['sorting']
     y = df['petrofacie'].values
     del df['petrofacie']
     df = df.reset_index(drop=True)
