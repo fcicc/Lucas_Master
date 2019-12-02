@@ -32,6 +32,7 @@ from package.utils import class_cluster_match
 ALLOWED_FITNESSES = [
     ('silhouette_sklearn', 1),
     ('adjusted_rand_score', 1),
+    ('f1_micro', 1),
     ('accuracy', 1)
 ]
 DICT_ALLOWED_FITNESSES = dict(ALLOWED_FITNESSES)

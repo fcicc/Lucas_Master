@@ -54,8 +54,7 @@ def main():
 
     datasets_folder = './datasets/'
     dataset_locations = {
-
-        # 'campus_basin': datasets_folder + '/CampusBasin/dataset.csv',
+        'campus_basin': datasets_folder + '/CampusBasin/dataset.csv',
         'equatorial_margin': datasets_folder + '/MargemEquatorial/dataset.csv',
         # 'talara_basin': datasets_folder + '/TalaraBasin/subtotals_dataset.xlsx',
         # 'carmopolis':        datasets_folder + '/Carmopolis/subtotals_dataset.xlsx',

@@ -3,7 +3,7 @@ from typing import List
 
 import numpy as np
 import pandas as pd
-from sqlalchemy import Column, Integer, DateTime, Float, ForeignKey, String, PickleType, create_engine
+from sqlalchemy import Column, Integer, DateTime, Float, ForeignKey, Interval, String, PickleType, create_engine
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.orm import relationship, sessionmaker
 
@@ -125,6 +125,7 @@ class Result(Base):
 
     start_time = Column(DateTime)
     end_time = Column(DateTime)
+    execution_interval = Column(Interval)
 
     initial_n_features = Column(Integer)
     final_n_features = Column(Integer)

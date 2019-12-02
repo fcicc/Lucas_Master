@@ -4,7 +4,7 @@ from package.orm_models import Result, ConfusionMatrix, ConfusionMatrixNumber, C
 
 
 def store_results(scores, initial_n_features, final_n_features, start_time,
-                  end_time, confusion_matrix, args, selected_columns, ga_metrics, cluster_labels):
+                  end_time, execution_interval, confusion_matrix, args, selected_columns, ga_metrics, cluster_labels):
     """
 
     :type scores: dict
@@ -15,6 +15,7 @@ def store_results(scores, initial_n_features, final_n_features, start_time,
     :type selected_columns: list
     :type end_time: datetime.datetime
     :type start_time: datetime.datetime
+    :type execution_interval: datetime.timedelta
     :type confusion_matrix: pandas.DataFrame
     """
 
@@ -27,6 +28,7 @@ def store_results(scores, initial_n_features, final_n_features, start_time,
         name=result_name,
         start_time=start_time,
         end_time=end_time,
+        execution_interval=execution_interval,
         initial_n_features=int(initial_n_features),
         final_n_features=int(final_n_features),
         individual_evaluations=ga_metrics

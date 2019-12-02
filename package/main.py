@@ -98,19 +98,20 @@ def run(args=None):
     else:
         meta_clustering.fit(dataset.values)
     end_time = datetime.datetime.now()
+    execution_interval = end_time - start_time
 
     if type(clustering_algorithm) == cluster.KMeans:
         clustering_algorithm = cluster.KMeans(n_clusters=len(unique_labels(y)), n_init=100)
 
     result_id, scores = save_output_to_db(args, clustering_algorithm, dataset, end_time,
-                                          meta_clustering, start_time, y)
+                                          meta_clustering, start_time, y, execution_interval)
 
     print(f'Results stored under the ID {result_id}')
 
     return scores, result_id
 
 
-def save_output_to_db(args, clustering_algorithm, dataset, end_time, meta_clustering, start_time, y):
+def save_output_to_db(args, clustering_algorithm, dataset, end_time, meta_clustering, start_time, y, execution_interval):
     best_features = []
     best_prediction = []
     if args.strategy == 'none':
@@ -146,7 +147,7 @@ def save_output_to_db(args, clustering_algorithm, dataset, end_time, meta_cluste
             best_phenotype += [0]
     scores = calculate_all_scores(best_phenotype, clustering_algorithm, dataset, y)
     result_id = store_results(scores, initial_n_features, final_n_features,
-                              start_time, end_time, None, args, best_features,
+                              start_time, end_time, execution_interval, None, args, best_features,
                               meta_clustering.metrics_, best_prediction)
     return result_id, scores
 
