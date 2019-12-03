@@ -8,40 +8,6 @@ def main():
     run_multiple = 1
     db_file = 'results.db'
 
-    # args = {
-    #     '-e': '0.1',
-    #     '--num-gen': '200',
-    #     '--pop-size': '600',
-    #     '--min-features': '2',
-    #     '--strategy': 'none',
-    #     '--db-file': db_file,
-    #     '--cluster-algorithm': 'copac',
-    #     '--k_neighbors': '60',
-    #     #'--eps': '30.0',
-    #     '--eps': '12.0',
-    #     '--min_samples': '1'
-    # }
-
-    # args = {
-    #     '-e': '0.1',
-    #     '--num-gen': '200',
-    #     '--pop-size': '600',
-    #     '--min-features': '2',
-    #     '--strategy': 'ga',
-    #     '--db-file': db_file,
-    #     '--cluster-algorithm': 'agglomerative'
-    # }
-
-    # args = {
-    #     '-e': '0.1',
-    #     '--num-gen': '200',
-    #     '--pop-size': '600',
-    #     '--min-features': '2',
-    #     '--strategy': 'none',
-    #     '--db-file': db_file,
-    #     '--cluster-algorithm': 'agglomerative'
-    # }
-
     # approach #1 - k-means
     # args = {
     #     '-e': '0.1',
@@ -65,19 +31,33 @@ def main():
     # }
 
     # approach #3 - Hierarchical + Genetic
+    # args = {
+    #     '-e': '0.1',
+    #     '--num-gen': '200',
+    #     '--pop-size': '600',
+    #     '--min-features': '2',
+    #     '--strategy': 'ga',
+    #     '--db-file': db_file,
+    #     '--cluster-algorithm': 'agglomerative'
+    # }
+
+    # approach #4 - COPAC
     args = {
         '-e': '0.1',
         '--num-gen': '200',
         '--pop-size': '600',
         '--min-features': '2',
-        '--strategy': 'ga',
+        '--strategy': 'none',
         '--db-file': db_file,
-        '--cluster-algorithm': 'agglomerative'
+        '--cluster-algorithm': 'copac',
+        '--k_neighbors': '123',
+        '--eps': '10.0',
+        '--min_samples': '1'
     }
 
     datasets_folder = './datasets/'
     dataset_locations = {
-        'campus_basin': datasets_folder + '/CampusBasin/dataset.csv',
+        # 'campus_basin': datasets_folder + '/CampusBasin/dataset.csv',
         'equatorial_margin': datasets_folder + '/MargemEquatorial/dataset.csv',
         # 'talara_basin': datasets_folder + '/TalaraBasin/subtotals_dataset.xlsx',
         # 'carmopolis':        datasets_folder + '/Carmopolis/subtotals_dataset.xlsx',
