@@ -123,7 +123,7 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
             population[ind][:] = [0]*X.shape[1]
             population = list(map(partial(force_bounds, self.min_features, self.max_features), population))
 
-        evaluate_rate_methods = ['accuracy']
+        evaluate_rate_methods = ['silhouette_sklearn']
         evaluate_rate_function = partial(eval_multiple, X, self.algorithm, evaluate_rate_methods, samples_dist_matrix, y)
 
         global_best = None
@@ -131,7 +131,6 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
         evaluate(toolbox, population)
         metrics = []
         gens_since_last_improvment = 0
-        current_silhouette = 0
         with tqdm(total=self.n_generations, desc=f'{n_threads} threads', postfix={'gens_without_improv': gens_since_last_improvment}) as pbar:
             for gen in range(self.n_generations):
                 pbar.update(1)
@@ -141,7 +140,7 @@ class GAClustering(sklearn.base.BaseEstimator, sklearn.base.ClusterMixin):
                     sample_fits = [metric + [gen] for metric in sample_fits]
                     metrics += sample_fits
 
-                offspring = algorithms.varOr(population, toolbox, self.pop_size, cxpb=0.5, mutpb=0.5)
+                offspring = algorithms.varOr(population, toolbox, self.pop_size, cxpb=0.1, mutpb=0.05)
                 offspring = evaluate(toolbox, offspring)
 
                 if global_best is None:

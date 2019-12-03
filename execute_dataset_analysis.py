@@ -42,14 +42,37 @@ def main():
     #     '--cluster-algorithm': 'agglomerative'
     # }
 
+    # approach #1 - k-means
+    # args = {
+    #     '-e': '0.1',
+    #     '--num-gen': '200',
+    #     '--pop-size': '600',
+    #     '--min-features': '2',
+    #     '--strategy': 'none',
+    #     '--db-file': db_file,
+    #     '--cluster-algorithm': 'kmeans'
+    # }
+
+    # approach #2 - Hierarchical
+    # args = {
+    #     '-e': '0.1',
+    #     '--num-gen': '200',
+    #     '--pop-size': '600',
+    #     '--min-features': '2',
+    #     '--strategy': 'none',
+    #     '--db-file': db_file,
+    #     '--cluster-algorithm': 'agglomerative'
+    # }
+
+    # approach #3 - Hierarchical + Genetic
     args = {
         '-e': '0.1',
         '--num-gen': '200',
         '--pop-size': '600',
         '--min-features': '2',
-        '--strategy': 'none',
+        '--strategy': 'ga',
         '--db-file': db_file,
-        '--cluster-algorithm': 'kmeans'
+        '--cluster-algorithm': 'agglomerative'
     }
 
     datasets_folder = './datasets/'
